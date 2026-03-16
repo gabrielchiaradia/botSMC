@@ -81,7 +81,7 @@ class TelegramNotifier:
         for m in senal.motivos:
             texto += f"• {m}\n"
 
-        texto += f"\n🕐 `{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC`"
+        texto += f"\n🕐 `{datetime.now().strftime('%Y-%m-%d %H:%M')} Local`"
         return self._enviar(texto)
 
     def trade_cerrado(self, trade, motivo: str) -> bool:
@@ -104,7 +104,7 @@ class TelegramNotifier:
             f"PnL %:    `{color_pnl}{trade.pnl_pct:.2f}%`\n"
             f"Capital:  `${trade.capital_out:,.2f} USDT`\n\n"
             f"⏱ Duración: `{trade.duracion_min} min`\n"
-            f"🕐 `{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC`"
+            f"🕐 `{datetime.now().strftime('%Y-%m-%d %H:%M')} Local`"
         )
         return self._enviar(texto)
 
@@ -123,7 +123,7 @@ class TelegramNotifier:
             f"*Losses:*  `{resumen.get('losses', 0)}`\n"
             f"*Win Rate:* `{resumen.get('win_rate', 0):.1f}%`\n\n"
             f"*PnL Total:* `{color_pnl}${pnl:.2f} USDT`\n\n"
-            f"🕐 `{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC`"
+            f"🕐 `{datetime.now().strftime('%Y-%m-%d %H:%M')} Local`"
         )
         return self._enviar(texto)
 
@@ -138,7 +138,7 @@ class TelegramNotifier:
             f"HTF:     `{htf}` (contexto)\n"
             f"Modo:    `{'PAPER' if modo == 'PAPER' else '⚡ LIVE'}`\n"
             f"Capital: `${capital:,.2f} USDT`\n"
-            f"🕐 `{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC`"
+            f"🕐 `{datetime.now().strftime('%Y-%m-%d %H:%M')} Local`"
         )
         return self._enviar(texto)
 
@@ -147,7 +147,7 @@ class TelegramNotifier:
         texto = (
             f"🔴 *SMC Bot Detenido*\n"
             f"Motivo: {motivo}\n"
-            f"🕐 `{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC`"
+            f"🕐 `{datetime.now().strftime('%Y-%m-%d %H:%M')} Local`"
         )
         return self._enviar(texto)
 
@@ -157,7 +157,7 @@ class TelegramNotifier:
             f"⚠️ *Error Crítico*\n"
             f"{'─'*28}\n"
             f"`{mensaje[:400]}`\n"
-            f"🕐 `{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC`"
+            f"🕐 `{datetime.now().strftime('%Y-%m-%d %H:%M')} Local`"
         )
         return self._enviar(texto)
 

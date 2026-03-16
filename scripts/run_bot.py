@@ -249,7 +249,7 @@ def exportar_dashboard(journal):
     if not datos:
         return
     lcfg.LOG_DIR.mkdir(parents=True, exist_ok=True)
-    path = lcfg.LOG_DIR / f"dashboard_trades_{datetime.utcnow().strftime('%Y%m%d')}.json"
+    path = lcfg.LOG_DIR / f"dashboard_trades_{datetime.now().strftime('%Y%m%d')}.json"
     try:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(datos, f, ensure_ascii=False, indent=2, default=str)
@@ -264,7 +264,7 @@ def mostrar_resumen(journal, modo, notifier):
     r     = journal.resumen_hoy()
     color = "\033[32m" if r["pnl_usd"] >= 0 else "\033[31m"
     reset = "\033[0m"
-    fecha = datetime.utcnow().strftime("%Y%m%d")
+    fecha = datetime.now().strftime("%Y%m%d")
     print(f"\n{'='*52}")
     print(f"{'  RESUMEN DEL DIA':^52}")
     print(f"{'='*52}")
@@ -362,8 +362,8 @@ def main():
             ciclo_n = 0
             while True:
                 ciclo_n += 1
-                logger.info("--- Ciclo %d | %s UTC ---",
-                            ciclo_n, datetime.utcnow().strftime("%H:%M:%S"))
+                logger.info("--- Ciclo %d | %s ---",
+                            ciclo_n, datetime.now().strftime("%H:%M:%S"))
                 try:
                     df_ltf = obtener_velas(client, excfg.SYMBOL, mcfg.LTF,
                                            limit=mcfg.LTF_CANDLES)

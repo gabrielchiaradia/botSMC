@@ -109,7 +109,7 @@ class TradeJournal:
         self.max_open   = max_open or rcfg.MAX_OPEN_TRADES
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
-        self._fecha           = datetime.utcnow().strftime("%Y%m%d")
+        self._fecha           = datetime.now().strftime("%Y%m%d")
         self._trades_abiertos: list[TradeLog] = []   # Lista de trades abiertos
         self._trade_counter   = self._contar_trades_hoy()
         self._racha_sl        = 0    # SL consecutivos
@@ -146,7 +146,7 @@ class TradeJournal:
             orden_id:   ID de orden de Binance (si se ejecutó)
         """
         log = SignalLog(
-            timestamp   = datetime.utcnow().isoformat(),
+            timestamp   = datetime.now().isoformat(),
             symbol      = self.symbol,
             timeframe   = self.timeframe,
             precio      = señal.precio_entrada,
@@ -180,7 +180,7 @@ class TradeJournal:
         """
         self._trade_counter += 1
         trade_id = (f"{self._fecha}_"
-                    f"{datetime.utcnow().strftime('%H%M%S')}_"
+                    f"{datetime.now().strftime('%H%M%S')}_"
                     f"{self.symbol}")
 
         trade = TradeLog(
@@ -188,7 +188,7 @@ class TradeJournal:
             symbol         = self.symbol,
             timeframe      = self.timeframe,
             modo           = self.modo,
-            timestamp_in   = datetime.utcnow().isoformat(),
+            timestamp_in   = datetime.now().isoformat(),
             direccion      = "LONG" if señal.direccion == "ALCISTA" else "SHORT",
             precio_entrada = señal.precio_entrada,
             stop_loss      = señal.stop_loss,
@@ -226,7 +226,7 @@ class TradeJournal:
 
         t = trade
         ts_in  = datetime.fromisoformat(t.timestamp_in)
-        ts_out = datetime.utcnow()
+        ts_out = datetime.now()
         dur    = int((ts_out - ts_in).total_seconds() / 60)
 
         if t.direccion == "LONG":
