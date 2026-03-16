@@ -134,3 +134,41 @@ def en_sesion_activa(timestamp, sesiones: list = None) -> bool:
     if not cfg.FILTRO_SESION:
         return True
     return sesion_activa(timestamp) in sesiones
+
+
+def en_ventana_horaria(timestamp) -> bool:
+    """
+    True si la hora del timestamp cae dentro de alguna ventana
+    de trading configurada en TRADING_WINDOWS.
+    Si no hay ventanas configuradas, retorna True (sin filtro).
+
+    Ejemplo: TRADING_WINDOWS=8-11,13-18
+      08:00 → True (apertura London)
+      12:00 → False (entre ventanas)
+      15:00 → True (core NY)
+      20:00 → False (fuera de horario)
+    """
+    windows = cfg.trading_windows()
+    if not windows:
+        return True  # Sin filtro horario
+
+    hora = timestamp.hour if hasattr(timestamp, 'hour') else pd.Timestamp(timestamp).hour
+
+    for inicio, fin in windows:
+        if inicio <= hora < fin:
+            return True
+    return False
+
+
+def descripcion_ventana_horaria(timestamp) -> str:
+    """Retorna descripción legible de la ventana actual o 'fuera de horario'."""
+    windows = cfg.trading_windows()
+    if not windows:
+        return "24h"
+
+    hora = timestamp.hour if hasattr(timestamp, 'hour') else pd.Timestamp(timestamp).hour
+
+    for inicio, fin in windows:
+        if inicio <= hora < fin:
+            return f"{inicio:02d}-{fin:02d}UTC"
+    return "fuera_horario"

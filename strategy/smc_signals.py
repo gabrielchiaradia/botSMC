@@ -18,6 +18,8 @@ from strategy.indicators import (
     detectar_tendencia,
     sesion_activa,
     en_sesion_activa,
+    en_ventana_horaria,
+    descripcion_ventana_horaria,
 )
 
 
@@ -65,6 +67,8 @@ class Señal:
     score:          int   = 0       # 0–100
     motivos:        list  = field(default_factory=list)
     sesion:         str   = ""
+    ventana:        str   = ""      # "08-11UTC" | "13-18UTC" | "fuera_horario"
+    fuera_de_horario: bool = False  # True = señal válida pero fuera de ventana
     atr:            float = 0.0
     tendencia:      str   = ""
 
@@ -282,6 +286,7 @@ def evaluar_señal(df: pd.DataFrame,
     señal = Señal(
         precio_entrada = precio,
         sesion         = sesion,
+        ventana        = descripcion_ventana_horaria(timestamp),
         atr            = atr_val,
         tendencia      = tendencia,
     )
@@ -300,9 +305,6 @@ def evaluar_señal(df: pd.DataFrame,
         return señal
 
     # ── Filtro volatilidad mínima ──────────────────────────
-    # Si el ATR es muy bajo respecto al precio, el mercado está
-    # comprimido y los stops serán tan ajustados que se barren
-    # por ruido. Umbral: ATR > 0.1% del precio.
     volatilidad_pct = atr_val / precio
     if volatilidad_pct < 0.001:
         señal.motivos.append(
@@ -312,12 +314,12 @@ def evaluar_señal(df: pd.DataFrame,
         return señal
 
     # ── Detección de confluencias ──────────────────────────
-    ventana = df.iloc[max(0, idx - cfg.FVG_LOOKBACK) : idx + 1]
-    fvgs    = detectar_fvg(ventana)
-    obs     = detectar_order_blocks(ventana)
+    ventana_df = df.iloc[max(0, idx - cfg.FVG_LOOKBACK) : idx + 1]
+    fvgs    = detectar_fvg(ventana_df)
+    obs     = detectar_order_blocks(ventana_df)
 
     # Mitigar FVGs ya tocados para no reusar zonas agotadas
-    mitigar_fvgs(fvgs, ventana, 0)
+    mitigar_fvgs(fvgs, ventana_df, 0)
 
     tipo_buscar = "ALCISTA" if tendencia == "ALCISTA" else "BAJISTA"
 
@@ -354,6 +356,18 @@ def evaluar_señal(df: pd.DataFrame,
         else:
             señal.stop_loss   = round(precio + dist_sl, 2)
             señal.take_profit = round(precio - dist_tp, 2)
+
+        # ── Filtro ventana horaria ─────────────────────────
+        # La señal se evalúa completa (con niveles) pero se marca
+        # como fuera_de_horario si no cae en las ventanas configuradas.
+        # En el bot en vivo se registra y notifica pero no se opera.
+        # En backtest se descarta.
+        if not en_ventana_horaria(timestamp):
+            señal.fuera_de_horario = True
+            señal.motivos.append(
+                f"⏰ Fuera de horario ({timestamp.hour:02d}:00 UTC, "
+                f"ventana: {señal.ventana})"
+            )
 
     return señal
 

@@ -69,6 +69,29 @@ class StrategyConfig:
     FILTRO_SESION:     bool  = os.getenv("FILTRO_SESION", "true").lower() == "true"
     SESIONES_ACTIVAS:  list  = os.getenv("SESIONES_ACTIVAS", "london,new_york").split(",")
 
+    # Ventanas horarias de trading (UTC).
+    # Formato: "HH-HH,HH-HH" → ej: "8-11,13-18"
+    # Solo se abren trades dentro de estas ventanas.
+    # Vacío = sin filtro horario (opera 24h).
+    TRADING_WINDOWS_RAW: str = os.getenv("TRADING_WINDOWS", "8-11,13-18")
+
+    @classmethod
+    def trading_windows(cls) -> list:
+        """Parsea TRADING_WINDOWS a lista de tuplas [(inicio, fin), ...]"""
+        raw = cls.TRADING_WINDOWS_RAW.strip()
+        if not raw:
+            return []
+        windows = []
+        for w in raw.split(","):
+            w = w.strip()
+            if "-" in w:
+                parts = w.split("-")
+                try:
+                    windows.append((int(parts[0]), int(parts[1])))
+                except ValueError:
+                    pass
+        return windows
+
 
 # ══════════════════════════════════════════════════════════
 #  BACKTEST

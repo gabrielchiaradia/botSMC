@@ -425,6 +425,11 @@ class BacktestEngine:
         if not señal.tiene_señal:
             return
 
+        # 1b. Filtro ventana horaria — en backtest se descarta
+        if señal.fuera_de_horario:
+            self._señales_filtradas += 1
+            return
+
         # 2. Aplicar perfil (filtros adicionales)
         if self.perfil is not None:
             from strategy.profiles.base_profile import FilterContext

@@ -193,6 +193,16 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
         journal.registrar_señal(senal, balance, "SIN_SEÑAL")
         return
 
+    # Filtro ventana horaria: señal válida pero fuera de horario
+    if senal.fuera_de_horario:
+        logger.info("⏰ Señal %s fuera de horario (%s). Registrando sin operar.",
+                    senal.direccion, senal.ventana)
+        journal.registrar_señal(senal, balance, "FUERA_DE_HORARIO")
+        # Notificar por Telegram para tracking
+        notifier.señal_detectada(senal, balance, 0, 0,
+                                  "⏰ FUERA DE HORARIO — no operada")
+        return
+
     # Evitar abrir en la misma dirección si ya hay trade abierto así
     dir_nueva = "LONG" if senal.direccion == "ALCISTA" else "SHORT"
     if journal.tiene_direccion_abierta(dir_nueva):
