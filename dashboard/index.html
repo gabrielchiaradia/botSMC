@@ -655,7 +655,7 @@ function inicializar(data) {
   renderHourChart(data);
   renderMonthChart(data);
   renderSessions(data);
-  renderTradesTable(data.trades);
+  renderTradesTable(data.trades || [], true);
 }
 
 // ═══════════════════════════════════════════
@@ -935,41 +935,81 @@ function renderSessions(d) {
 // ═══════════════════════════════════════════
 //  TRADES TABLE
 // ═══════════════════════════════════════════
-let allTrades = [];
-function renderTradesTable(trades) {
-  allTrades = trades;
-  document.getElementById('trade-count').textContent = `${trades.length} trades`;
-  const tbody = document.getElementById('trades-tbody');
-  tbody.innerHTML = trades.slice(-200).reverse().map(t => {
-    const pnlC = t.pnl_usd >= 0 ? 'pnl-pos' : 'pnl-neg';
-    const pnlSign = t.pnl_usd >= 0 ? '+' : '';
-    return `<tr>
-      <td style="color:var(--muted)">${t.id}</td>
-      <td>${t.timestamp_in.slice(0,16).replace('T',' ')}</td>
-      <td>${t.timestamp_out.slice(0,16).replace('T',' ')}</td>
-      <td><span class="badge badge-${t.direccion.toLowerCase()}">${t.direccion}</span></td>
-      <td>$${(+t.precio_entrada).toLocaleString('en',{maximumFractionDigits:0})}</td>
-      <td>$${(+t.precio_salida).toLocaleString('en',{maximumFractionDigits:0})}</td>
-      <td style="color:var(--red)">$${(+t.stop_loss).toLocaleString('en',{maximumFractionDigits:0})}</td>
-      <td style="color:var(--green)">$${(+t.take_profit).toLocaleString('en',{maximumFractionDigits:0})}</td>
-      <td style="color:var(--muted)">${(+t.tamaño).toFixed(4)}</td>
-      <td class="${pnlC}">${pnlSign}$${(+t.pnl_usd).toFixed(2)}</td>
-      <td class="${pnlC}">${pnlSign}${(+t.pnl_pct).toFixed(2)}%</td>
-      <td style="color:var(--muted)">${t.duracion_min}m</td>
-      <td><span class="badge badge-sesion">${(t.sesion||'—').toUpperCase()}</span></td>
-      <td style="color:var(--yellow)">${t.score_señal||'—'}</td>
-      <td><span class="badge badge-${t.resultado.toLowerCase()}">${t.resultado}</span></td>
-    </tr>`;
-  }).join('');
+var allTrades = [];
+var _originalTrades = [];
+
+function renderTradesTable(trades, isOriginal) {
+  if (isOriginal) {
+    _originalTrades = trades || [];
+    allTrades = _originalTrades;
+  }
+  var displayTrades = trades || [];
+  var countEl = document.getElementById('trade-count');
+  if (countEl) countEl.textContent = displayTrades.length + ' trades';
+  var tbody = document.getElementById('trades-tbody');
+  if (!tbody) return;
+
+  var rows = [];
+  var list = displayTrades.slice(-200).reverse();
+  for (var i = 0; i < list.length; i++) {
+    var t = list[i];
+    var pnlUsd = Number(t.pnl_usd) || 0;
+    var pnlPct = Number(t.pnl_pct) || 0;
+    var pnlC = pnlUsd >= 0 ? 'pnl-pos' : 'pnl-neg';
+    var pnlSign = pnlUsd >= 0 ? '+' : '';
+    var pe = Number(t.precio_entrada) || 0;
+    var ps = Number(t.precio_salida) || 0;
+    var sl = Number(t.stop_loss) || 0;
+    var tp = Number(t.take_profit) || 0;
+    var tam = Number(t.tamaño || t.tamaño_activo) || 0;
+    var dir = String(t.direccion || '—').toUpperCase();
+    var res = String(t.resultado || '—').toUpperCase();
+    var ses = String(t.sesion || '—').toUpperCase();
+    var score = t.score_señal || t.score || '—';
+    var tsIn = String(t.timestamp_in || '').slice(0,16).replace('T',' ');
+    var tsOut = String(t.timestamp_out || '').slice(0,16).replace('T',' ');
+    var dur = Number(t.duracion_min) || 0;
+    var rMax = (t.r_maximo && Number(t.r_maximo) > 0) ? Number(t.r_maximo).toFixed(1) + 'R' : '—';
+    var dirClass = dir === 'LONG' ? 'long' : dir === 'SHORT' ? 'short' : 'sesion';
+    var resClass = res === 'WIN' ? 'win' : res === 'LOSS' ? 'loss' : 'sesion';
+    var tpStr = tp > 0 ? '$' + tp.toFixed(2) : 'trailing';
+
+    rows.push('<tr>'
+      + '<td style="color:var(--muted)">' + (t.id || '—') + '</td>'
+      + '<td>' + tsIn + '</td>'
+      + '<td>' + tsOut + '</td>'
+      + '<td><span class="badge badge-' + dirClass + '">' + dir + '</span></td>'
+      + '<td>$' + pe.toFixed(2) + '</td>'
+      + '<td>$' + ps.toFixed(2) + '</td>'
+      + '<td style="color:var(--red)">$' + sl.toFixed(2) + '</td>'
+      + '<td style="color:var(--green)">' + tpStr + '</td>'
+      + '<td style="color:var(--muted)">' + tam.toFixed(4) + '</td>'
+      + '<td class="' + pnlC + '">' + pnlSign + '$' + pnlUsd.toFixed(2) + '</td>'
+      + '<td class="' + pnlC + '">' + pnlSign + pnlPct.toFixed(2) + '%</td>'
+      + '<td style="color:var(--muted)">' + dur + 'm</td>'
+      + '<td><span class="badge badge-sesion">' + ses + '</span></td>'
+      + '<td style="color:var(--yellow)">' + score + '</td>'
+      + '<td><span class="badge badge-' + resClass + '">' + res + '</span></td>'
+      + '</tr>');
+  }
+  tbody.innerHTML = rows.join('');
 }
 
 function filtrarTrades(filtro, btn) {
-  document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
+  var tabs = document.querySelectorAll('.filter-tab');
+  for (var i = 0; i < tabs.length; i++) { tabs[i].classList.remove('active'); }
   btn.classList.add('active');
-  if (filtro === 'all')  return renderTradesTable(allTrades);
-  if (filtro === 'WIN' || filtro === 'LOSS')
-    return renderTradesTable(allTrades.filter(t => t.resultado === filtro));
-  return renderTradesTable(allTrades.filter(t => t.direccion === filtro));
+  if (filtro === 'all') return renderTradesTable(_originalTrades);
+  var filtered = [];
+  for (var j = 0; j < _originalTrades.length; j++) {
+    var t = _originalTrades[j];
+    if (filtro === 'WIN' || filtro === 'LOSS') {
+      if (String(t.resultado||'').toUpperCase() === filtro) filtered.push(t);
+    } else {
+      if (String(t.direccion||'').toUpperCase() === filtro) filtered.push(t);
+    }
+  }
+  return renderTradesTable(filtered);
 }
 
 // ═══════════════════════════════════════════
