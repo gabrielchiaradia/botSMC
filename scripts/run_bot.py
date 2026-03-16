@@ -338,7 +338,7 @@ def main():
                 usar_ws = False
 
         if usar_ws:
-            def on_senal(df_ltf, df_htf):
+            def on_señal(df_ltf, df_htf):
                 procesar_velas(df_ltf, df_htf, client, args.live,
                                journal, notifier, balance_ref)
 
@@ -346,7 +346,7 @@ def main():
                 symbol     = excfg.SYMBOL,
                 ltf        = mcfg.LTF,
                 htf        = mcfg.HTF,
-                on_senal   = on_senal,
+                on_señal   = on_señal,
                 testnet    = excfg.TESTNET,
             )
             stream.iniciar(df_ltf_hist, df_htf_hist)
