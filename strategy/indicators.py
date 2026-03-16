@@ -48,14 +48,14 @@ def detectar_swings(df: pd.DataFrame, length: int = None) -> pd.Series:
 
 def obtener_swing_highs(df: pd.DataFrame, swings: pd.Series) -> list[tuple]:
     """Retorna lista de (timestamp, precio) de todos los swing highs."""
-    return [(idx, df.loc[idx, "high"])
-            for idx in swings.index if swings.loc[idx] == 1]
+    return [(swings.index[i], df["high"].iloc[i])
+            for i in range(len(swings)) if swings.iloc[i] == 1]
 
 
 def obtener_swing_lows(df: pd.DataFrame, swings: pd.Series) -> list[tuple]:
     """Retorna lista de (timestamp, precio) de todos los swing lows."""
-    return [(idx, df.loc[idx, "low"])
-            for idx in swings.index if swings.loc[idx] == -1]
+    return [(swings.index[i], df["low"].iloc[i])
+            for i in range(len(swings)) if swings.iloc[i] == -1]
 
 
 # ══════════════════════════════════════════════════════════

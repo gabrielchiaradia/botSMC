@@ -373,8 +373,8 @@ def analizar_mercado(df: pd.DataFrame) -> dict:
     fvgs   = detectar_fvg(df)
     obs    = detectar_order_blocks(df)
 
-    highs = [(idx, df.loc[idx, "high"]) for idx in swings.index if swings.loc[idx] == 1]
-    lows  = [(idx, df.loc[idx, "low"])  for idx in swings.index if swings.loc[idx] == -1]
+    highs = [(swings.index[i], df["high"].iloc[i]) for i in range(len(swings)) if swings.iloc[i] == 1]
+    lows  = [(swings.index[i], df["low"].iloc[i])  for i in range(len(swings)) if swings.iloc[i] == -1]
 
     return {
         "señal":     señal,
