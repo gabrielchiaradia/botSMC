@@ -203,13 +203,6 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
                                   "⏰ FUERA DE HORARIO — no operada")
         return
 
-    # Evitar abrir en la misma dirección si ya hay trade abierto así
-    dir_nueva = "LONG" if senal.direccion == "ALCISTA" else "SHORT"
-    if journal.tiene_direccion_abierta(dir_nueva):
-        logger.info("Ya hay trade %s abierto. Ignorando señal.", dir_nueva)
-        journal.registrar_señal(senal, balance, "DIRECCION_DUPLICADA")
-        return
-
     # Calcular tamanio
     res     = resumen_riesgo(balance, senal.precio_entrada, senal.stop_loss, senal.take_profit)
     tamanio = res["tamaño"]

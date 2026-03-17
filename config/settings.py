@@ -75,22 +75,24 @@ class StrategyConfig:
     # Vacío = sin filtro horario (opera 24h).
     TRADING_WINDOWS_RAW: str = os.getenv("TRADING_WINDOWS", "8-11,13-18")
 
-    @classmethod
-    def trading_windows(cls) -> list:
-        """Parsea TRADING_WINDOWS a lista de tuplas [(inicio, fin), ...]"""
-        raw = cls.TRADING_WINDOWS_RAW.strip()
-        if not raw:
-            return []
-        windows = []
-        for w in raw.split(","):
-            w = w.strip()
-            if "-" in w:
-                parts = w.split("-")
-                try:
-                    windows.append((int(parts[0]), int(parts[1])))
-                except ValueError:
-                    pass
-        return windows
+
+def parse_trading_windows(raw: str = None) -> list:
+    """Parsea TRADING_WINDOWS a lista de tuplas [(inicio, fin), ...]"""
+    if raw is None:
+        raw = StrategyConfig.TRADING_WINDOWS_RAW
+    raw = raw.strip()
+    if not raw:
+        return []
+    windows = []
+    for w in raw.split(","):
+        w = w.strip()
+        if "-" in w:
+            parts = w.split("-")
+            try:
+                windows.append((int(parts[0]), int(parts[1])))
+            except ValueError:
+                pass
+    return windows
 
 
 # ══════════════════════════════════════════════════════════

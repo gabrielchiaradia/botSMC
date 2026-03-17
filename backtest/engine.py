@@ -70,6 +70,9 @@ class BacktestStats:
     perfil:             str   = "base"
     perfil_descripcion: str   = ""
     trailing_mode:      str   = "none"       # none | escalones | atr | hibrido
+    tp_rr_ratio:        float = 0.0          # RR configurado (1:X)
+    dias:               int   = 0            # Días de backtest
+    max_open_trades:    int   = 1            # Trades simultáneos configurados
     total_trades:       int   = 0
     wins:               int   = 0
     losses:             int   = 0
@@ -92,6 +95,7 @@ class BacktestStats:
     trades_por_sesion:  dict  = field(default_factory=dict)
     trades_por_hora:    dict  = field(default_factory=dict)
     señales_filtradas:  int   = 0
+    motivos_filtro:     dict  = field(default_factory=dict)  # {motivo: count}
 
 
 # ══════════════════════════════════════════════════════════
@@ -170,11 +174,12 @@ class BacktestEngine:
 
         # Estado interno
         self._capital           = self.capital0
-        self._posiciones: list[TradeRecord] = []     # Lista de posiciones abiertas
+        self._posiciones: list[TradeRecord] = []
         self._trades:   list[TradeRecord] = []
         self._equity:   list[dict]        = []
         self._trade_id          = 0
         self._señales_filtradas = 0
+        self._motivos_filtro: dict = {}   # {motivo: count}
         self._cooldown_restante = 0
         self._perdida_dia       = 0.0
         self._dia_actual        = None
@@ -419,6 +424,13 @@ class BacktestEngine:
                      pos.id, pos.resultado, precio_cierre, pnl,
                      pos.r_maximo, self.trailing_mode, len(self._posiciones))
 
+    def _registrar_filtro(self, motivo: str):
+        """Registra un motivo de filtro para estadísticas."""
+        self._señales_filtradas += 1
+        # Simplificar motivo para agrupar
+        clave = motivo.split("(")[0].strip().split(":")[0].strip()
+        self._motivos_filtro[clave] = self._motivos_filtro.get(clave, 0) + 1
+
     def _buscar_entrada(self, i: int):
         # 1. Evaluar señal SMC base
         señal = evaluar_señal(self.df, self.swings, self.atr, i)
@@ -427,7 +439,7 @@ class BacktestEngine:
 
         # 1b. Filtro ventana horaria — en backtest se descarta
         if señal.fuera_de_horario:
-            self._señales_filtradas += 1
+            self._registrar_filtro("Fuera de horario")
             return
 
         # 2. Aplicar perfil (filtros adicionales)
@@ -442,21 +454,22 @@ class BacktestEngine:
             )
             pasa, motivos_filtro = self.perfil.apply(ctx)
             if not pasa:
-                self._señales_filtradas += 1
+                motivo = motivos_filtro[-1] if motivos_filtro else "Perfil"
+                self._registrar_filtro(motivo)
                 logger.debug("Señal filtrada por perfil '%s': %s",
-                             self.perfil.nombre,
-                             motivos_filtro[-1] if motivos_filtro else "—")
+                             self.perfil.nombre, motivo)
                 return
             señal.motivos.extend(
                 m for m in motivos_filtro
                 if m and m not in señal.motivos
             )
 
-        # 3. Evitar abrir en la misma dirección si ya hay posición abierta igual
+        # 3. Evitar duplicar entrada en la misma vela
         dir_nueva = "LONG" if señal.direccion == "ALCISTA" else "SHORT"
+        timestamp_actual = str(self.df.index[i])
         for pos_abierta in self._posiciones:
-            if pos_abierta.direccion == dir_nueva:
-                return  # Ya hay trade abierto en esta dirección
+            if pos_abierta.timestamp_in == timestamp_actual:
+                return  # Ya se abrió un trade en esta vela
 
         # 4. Calcular tamaño y abrir posición
         tamaño = calcular_tamaño(self._capital, señal.precio_entrada, señal.stop_loss)
@@ -600,6 +613,9 @@ class BacktestEngine:
             perfil              = nombre_perfil,
             perfil_descripcion  = desc_perfil,
             trailing_mode       = self.trailing_mode,
+            tp_rr_ratio         = rcfg.TP_RR_RATIO,
+            dias                = (self.df.index[-1] - self.df.index[0]).days,
+            max_open_trades     = self.max_open_trades,
             total_trades        = len(trades),
             wins                = len(wins),
             losses              = len(losses),
@@ -622,6 +638,7 @@ class BacktestEngine:
             trades_por_sesion   = por_sesion,
             trades_por_hora     = por_hora,
             señales_filtradas   = self._señales_filtradas,
+            motivos_filtro      = dict(self._motivos_filtro),
         )
 
 

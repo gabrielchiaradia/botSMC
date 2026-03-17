@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SMC Bot — Guía de Backtesting</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink:     #0f0f0f;
+  --paper:   #f5f2eb;
+  --cream:   #ede9df;
+  --rule:    #d4cfc4;
+  --accent:  #c1440e;
+  --accent2: #1a5c3a;
+  --code-bg: #1c1c1c;
+  --code-fg: #e8e0d0;
+  --warn:    #8b5e00;
+  --warn-bg: #fdf6e3;
+  --ok:      #1a5c3a;
+  --ok-bg:   #edf7f1;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { background: var(--paper); color: var(--ink); font-family: 'IBM Plex Mono', monospace; font-size: 13px; line-height: 1.8; min-height: 100vh; }
+body::before { content: ''; position: fixed; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events: none; z-index: 0; opacity: 0.4; }
+.page { max-width: 920px; margin: 0 auto; padding: 0 32px 80px; position: relative; z-index: 1; }
+.cover { border-bottom: 3px double var(--rule); padding: 60px 0 40px; margin-bottom: 48px; }
+.cover-tag { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); margin-bottom: 16px; }
+.cover h1 { font-family: 'DM Serif Display', serif; font-size: clamp(32px, 5vw, 52px); line-height: 1.1; color: var(--ink); margin-bottom: 12px; }
+.cover h1 em { color: var(--accent); font-style: italic; }
+.cover-sub { color: #5a5449; font-size: 12px; margin-bottom: 28px; }
+.cover-meta { display: flex; gap: 24px; flex-wrap: wrap; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #8a8070; padding-top: 20px; border-top: 1px solid var(--rule); }
+.cover-meta span::before { content: '◆ '; color: var(--accent); }
+.toc { background: var(--cream); border: 1px solid var(--rule); border-left: 4px solid var(--accent); padding: 24px 28px; margin-bottom: 48px; }
+.toc h2 { font-family: 'DM Serif Display', serif; font-size: 16px; margin-bottom: 16px; color: var(--ink); }
+.toc ol { padding-left: 20px; }
+.toc li { margin-bottom: 6px; }
+.toc a { color: var(--ink); text-decoration: none; font-size: 12px; border-bottom: 1px dotted var(--rule); transition: color 0.2s; }
+.toc a:hover { color: var(--accent); border-color: var(--accent); }
+.section { margin-bottom: 56px; }
+.section-header { display: flex; align-items: baseline; gap: 16px; border-bottom: 2px solid var(--ink); padding-bottom: 8px; margin-bottom: 28px; }
+.section-num { font-family: 'DM Serif Display', serif; font-size: 42px; color: var(--rule); line-height: 1; flex-shrink: 0; }
+.section-title { font-family: 'DM Serif Display', serif; font-size: 22px; color: var(--ink); }
+h3 { font-family: 'DM Serif Display', serif; font-size: 16px; margin: 28px 0 12px; color: var(--ink); }
+h3::before { content: '§ '; color: var(--accent); font-style: italic; }
+p { margin-bottom: 12px; color: #2a2520; }
+pre { background: var(--code-bg); color: var(--code-fg); border-radius: 4px; padding: 20px 24px; overflow-x: auto; margin: 16px 0; font-size: 12px; line-height: 1.7; position: relative; border-left: 3px solid var(--accent); }
+pre .comment { color: #6a6055; }
+pre .cmd { color: #7ab8f5; }
+pre .val { color: #9ec88a; }
+pre .warn-c { color: #f0c060; }
+code { background: var(--cream); border: 1px solid var(--rule); padding: 1px 5px; border-radius: 2px; font-size: 11px; color: var(--accent); }
+pre code { background: none; border: none; padding: 0; color: inherit; font-size: inherit; }
+.code-block { position: relative; }
+.copy-btn { position: absolute; top: 10px; right: 10px; background: #2e2e2e; border: 1px solid #444; color: #aaa; font-family: 'IBM Plex Mono', monospace; font-size: 10px; padding: 3px 8px; border-radius: 3px; cursor: pointer; transition: all 0.2s; letter-spacing: 0.05em; }
+.copy-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.copy-btn.copied { background: var(--accent2); color: #fff; border-color: var(--accent2); }
+.alert { padding: 14px 18px; border-radius: 2px; margin: 16px 0; font-size: 12px; line-height: 1.6; border-left: 4px solid; }
+.alert-warn { background: var(--warn-bg); border-color: var(--warn); color: var(--warn); }
+.alert-ok { background: var(--ok-bg); border-color: var(--ok); color: var(--ok); }
+.alert-info { background: var(--cream); border-color: var(--rule); color: #5a5449; }
+.alert strong { display: block; margin-bottom: 4px; text-transform: uppercase; font-size: 10px; letter-spacing: 0.1em; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 11px; }
+th { background: var(--ink); color: var(--paper); padding: 8px 12px; text-align: left; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; font-size: 10px; }
+td { padding: 8px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+tr:nth-child(even) td { background: var(--cream); }
+td code { font-size: 11px; }
+footer { border-top: 3px double var(--rule); padding: 24px 0; margin-top: 60px; font-size: 10px; color: #8a8070; display: flex; justify-content: space-between; align-items: center; letter-spacing: 0.05em; }
+@media (max-width: 600px) { .page { padding: 0 16px 60px; } .cover h1 { font-size: 28px; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- PORTADA -->
+<div class="cover">
+  <div class="cover-tag">Referencia de backtesting · v1.0</div>
+  <h1>SMC Futures Bot<br><em>Guía de Backtesting</em></h1>
+  <div class="cover-sub">Todos los parámetros CLI, opciones de prueba y plan de exploración sistemática</div>
+  <div class="cover-meta">
+    <span>run_backtest.py</span>
+    <span>run_systematic.py</span>
+    <span>Ventanas horarias</span>
+    <span>Perfiles</span>
+    <span>Trailing</span>
+  </div>
+</div>
+
+<!-- ÍNDICE -->
+<div class="toc">
+  <h2>Índice</h2>
+  <ol>
+    <li><a href="#s1">Referencia CLI: run_backtest.py</a></li>
+    <li><a href="#s2">Referencia CLI: run_systematic.py</a></li>
+    <li><a href="#s3">Ventanas horarias (Trading Windows)</a></li>
+    <li><a href="#s4">Plan de pruebas: Timeframes y Ventanas</a></li>
+    <li><a href="#s5">Plan de pruebas: Perfiles y Trailing</a></li>
+    <li><a href="#s6">Plan de pruebas: Parámetros de riesgo</a></li>
+    <li><a href="#s7">Plan de pruebas: Multi-trade</a></li>
+    <li><a href="#s8">Mega-comparación: comandos listos para copiar</a></li>
+    <li><a href="#s9">Cómo interpretar los resultados</a></li>
+    <li><a href="#s10">Comparar resultados: compare_results.py</a></li>
+  </ol>
+</div>
+
+
+<!-- 1 -->
+<div class="section" id="s1">
+  <div class="section-header">
+    <span class="section-num">01</span>
+    <span class="section-title">Referencia CLI: run_backtest.py</span>
+  </div>
+
+  <table>
+    <tr><th>Parámetro</th><th>Valores</th><th>Default</th><th>Descripción</th></tr>
+    <tr><td><code>--symbol</code></td><td><code>ETHUSDT</code>, <code>BTCUSDT</code></td><td>.env</td><td>Par de trading</td></tr>
+    <tr><td><code>--timeframe</code></td><td><code>15m</code>, <code>1h</code></td><td>.env</td><td>Temporalidad de las velas</td></tr>
+    <tr><td><code>--dias</code></td><td>1–730</td><td>90</td><td>Días de historia a descargar</td></tr>
+    <tr><td><code>--capital</code></td><td>cualquier número</td><td>1000</td><td>Capital inicial en USDT</td></tr>
+    <tr><td><code>--strategy</code></td><td><code>base</code>, <code>ob_bos</code>, <code>ema_filter</code>, <code>ob_bos_ema</code></td><td>base</td><td>Perfil de estrategia</td></tr>
+    <tr><td><code>--trailing</code></td><td><code>none</code>, <code>escalones</code>, <code>atr</code>, <code>hibrido</code></td><td>none</td><td>Modo de trailing stop</td></tr>
+    <tr><td><code>--max-trades</code></td><td>1–5</td><td>1</td><td>Trades simultáneos máximos</td></tr>
+    <tr><td><code>--racha-reduce</code></td><td>1–10</td><td>3</td><td>Tras N SL seguidos, baja a 1 trade</td></tr>
+    <tr><td><code>--cooldown</code></td><td>0–20</td><td>3</td><td>Velas de espera después de un SL</td></tr>
+    <tr><td><code>--windows</code></td><td><code>8-11,13-18</code></td><td>.env</td><td>Ventanas horarias UTC (override .env)</td></tr>
+    <tr><td><code>--score</code></td><td>0–100</td><td>.env</td><td>Score mínimo para operar (override .env)</td></tr>
+    <tr><td><code>--rr</code></td><td>1.0–10.0</td><td>.env</td><td>Ratio riesgo:recompensa (override .env)</td></tr>
+    <tr><td><code>--atr-mult</code></td><td>0.5–5.0</td><td>2.0</td><td>Multiplicador ATR para trailing ATR</td></tr>
+    <tr><td><code>--compare</code></td><td>flag</td><td>—</td><td>Comparar todos los perfiles</td></tr>
+    <tr><td><code>--compare-trailing</code></td><td>flag</td><td>—</td><td>Comparar los 4 modos de trailing</td></tr>
+    <tr><td><code>--profiles</code></td><td>lista</td><td>todos</td><td>Perfiles específicos a comparar</td></tr>
+    <tr><td><code>--output</code></td><td>nombre.json</td><td>auto</td><td>Nombre del JSON de salida</td></tr>
+    <tr><td><code>--list-profiles</code></td><td>flag</td><td>—</td><td>Listar perfiles y salir</td></tr>
+  </table>
+
+  <h3>Ejemplo básico</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 1h --dias 180</pre>
+  </div>
+
+  <h3>Ejemplo completo con todos los overrides</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 360 --strategy ob_bos --trailing hibrido --max-trades 2 --windows 8-11,13-18 --score 50 --rr 2.0</pre>
+  </div>
+</div>
+
+
+<!-- 2 -->
+<div class="section" id="s2">
+  <div class="section-header">
+    <span class="section-num">02</span>
+    <span class="section-title">Referencia CLI: run_systematic.py</span>
+  </div>
+
+  <table>
+    <tr><th>Parámetro</th><th>Valores</th><th>Default</th><th>Descripción</th></tr>
+    <tr><td><code>--symbol</code></td><td><code>ETHUSDT</code>, <code>BTCUSDT</code></td><td>auto</td><td>Forzar par (salta Fase 1)</td></tr>
+    <tr><td><code>--timeframe</code></td><td><code>15m</code>, <code>1h</code></td><td>auto</td><td>Forzar timeframe (salta Fase 1)</td></tr>
+    <tr><td><code>--dias</code></td><td>1–730</td><td>90</td><td>Días de historia</td></tr>
+    <tr><td><code>--capital</code></td><td>cualquier número</td><td>1000</td><td>Capital inicial</td></tr>
+    <tr><td><code>--max-trades</code></td><td>1–5</td><td>1</td><td>Trades simultáneos</td></tr>
+    <tr><td><code>--racha-reduce</code></td><td>1–10</td><td>3</td><td>Reducir tras N SL seguidos</td></tr>
+    <tr><td><code>--windows</code></td><td><code>8-11,13-18</code></td><td>.env</td><td>Ventanas horarias UTC</td></tr>
+    <tr><td><code>--output</code></td><td>nombre.json</td><td>auto</td><td>Nombre del JSON</td></tr>
+  </table>
+
+  <p>El systematic prueba automáticamente en 5 fases: par+timeframe, perfil+trailing, score+ATR, TP/RR ratio, y trailing final.</p>
+
+  <h3>Ejemplo: optimización completa sobre ETH/1h con ventanas</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python</span> scripts/run_systematic.py --symbol ETHUSDT --timeframe 1h --dias 360 --max-trades 2 --windows 8-11,13-18</pre>
+  </div>
+</div>
+
+
+<!-- 3 -->
+<div class="section" id="s3">
+  <div class="section-header">
+    <span class="section-num">03</span>
+    <span class="section-title">Ventanas horarias (Trading Windows)</span>
+  </div>
+
+  <p>Las ventanas definen en qué horas UTC el bot puede abrir trades. Fuera de esas horas, el bot analiza y detecta señales pero no opera.</p>
+
+  <table>
+    <tr><th>Ventana</th><th>Horario UTC</th><th>GMT-3 (Argentina)</th><th>Qué cubre</th></tr>
+    <tr><td><code>8-11</code></td><td>08:00 – 11:00</td><td>05:00 – 08:00</td><td>Apertura London</td></tr>
+    <tr><td><code>13-18</code></td><td>13:00 – 18:00</td><td>10:00 – 15:00</td><td>Core New York</td></tr>
+    <tr><td><code>7-16</code></td><td>07:00 – 16:00</td><td>04:00 – 13:00</td><td>London completa</td></tr>
+    <tr><td><code>12-21</code></td><td>12:00 – 21:00</td><td>09:00 – 18:00</td><td>New York completa</td></tr>
+    <tr><td><code>2-10</code></td><td>02:00 – 10:00</td><td>23:00 – 07:00</td><td>Asia completa</td></tr>
+    <tr><td><code>8-11,13-18</code></td><td>combinado</td><td>combinado</td><td>Aperturas London + NY</td></tr>
+    <tr><td>(vacío)</td><td>24h</td><td>24h</td><td>Sin filtro horario</td></tr>
+  </table>
+
+  <h3>Formato</h3>
+  <p>Las ventanas se definen como <code>HH-HH</code> separadas por coma. Ejemplo: <code>8-11,13-18</code> significa que solo se opera de 8 a 11 y de 13 a 18 UTC.</p>
+
+  <div class="alert alert-info">
+    <strong>Tip</strong>
+    Una ventana vacía (<code>--windows ""</code>) desactiva el filtro y opera 24 horas. Útil para comparar con y sin filtro.
+  </div>
+</div>
+
+
+<!-- 4 -->
+<div class="section" id="s4">
+  <div class="section-header">
+    <span class="section-num">04</span>
+    <span class="section-title">Plan de pruebas: Timeframes y Ventanas</span>
+  </div>
+
+  <p>Objetivo: encontrar la mejor combinación de timeframe y ventana horaria. Los timeframes cortos generan más señales pero son más ruidosos.</p>
+
+  <h3>Test 4.1 — ETH/15m por ventana horaria (180 días)</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="comment"># Solo apertura London</span>
+<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows 8-11
+
+<span class="comment"># Solo core New York</span>
+<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows 13-18
+
+<span class="comment"># Ambas aperturas</span>
+<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows 8-11,13-18
+
+<span class="comment"># London completa</span>
+<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows 7-16
+
+<span class="comment"># Sin filtro (24h)</span>
+<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows ""</pre>
+  </div>
+
+  <h3>Test 4.2 — ETH/1h por ventana horaria (360 días)</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 1h --dias 360 --windows 8-11
+<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 1h --dias 360 --windows 13-18
+<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 1h --dias 360 --windows 8-11,13-18
+<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 1h --dias 360 --windows ""</pre>
+  </div>
+
+  <h3>Test 4.3 — BTC mismas ventanas (comparar pares)</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python</span> scripts/run_backtest.py --symbol BTCUSDT --timeframe 15m --dias 180 --windows 8-11,13-18
+<span class="cmd">python</span> scripts/run_backtest.py --symbol BTCUSDT --timeframe 1h --dias 360 --windows 8-11,13-18</pre>
+  </div>
+
+  <h3>Test 4.4 — Ventanas granulares (encontrar la hora óptima)</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="comment"># Probar cada hora de London</span>
+<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows 7-9
+<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows 9-11
+<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows 11-13
+
+<span class="comment"># Probar cada hora de NY</span>
+<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows 13-15
+<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows 15-17
+<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows 17-19</pre>
+  </div>
+</div>
+
+
+<!-- 5 -->
+<div class="section" id="s5">
+  <div class="section-header">
+    <span class="section-num">05</span>
+    <span class="section-title">Plan de pruebas: Perfiles y Trailing</span>
+  </div>
+
+  <h3>Perfiles disponibles</h3>
+  <table>
+    <tr><th>Perfil</th><th>Filtros</th><th>Trades esperados</th></tr>
+    <tr><td><code>base</code></td><td>FVG + OB + BOS. Sin filtros extra.</td><td>Muchos</td></tr>
+    <tr><td><code>ob_bos</code></td><td>Solo OBs precedidos por BOS</td><td>Menos, más selectivo</td></tr>
+    <tr><td><code>ema_filter</code></td><td>EMA 50/200 + distancia + confirmación</td><td>Moderado</td></tr>
+    <tr><td><code>ob_bos_ema</code></td><td>ob_bos + ema_filter combinados</td><td>Muy pocos, ultra selectivo</td></tr>
+  </table>
+
+  <h3>Test 5.1 — Comparar todos los perfiles en la mejor ventana</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python</span> scripts/run_backtest.py --compare --timeframe 1h --dias 360 --windows 8-11,13-18</pre>
+  </div>
+
+  <h3>Test 5.2 — Comparar trailing con el mejor perfil</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python</span> scripts/run_backtest.py --compare-trailing --strategy ob_bos --timeframe 1h --dias 360 --windows 8-11,13-18</pre>
+  </div>
+
+  <h3>Test 5.3 — Cada perfil × cada trailing (15m, ventana London)</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python</span> scripts/run_backtest.py --strategy base --trailing none --timeframe 15m --dias 180 --windows 8-11
+<span class="cmd">python</span> scripts/run_backtest.py --strategy base --trailing hibrido --timeframe 15m --dias 180 --windows 8-11
+<span class="cmd">python</span> scripts/run_backtest.py --strategy ob_bos --trailing none --timeframe 15m --dias 180 --windows 8-11
+<span class="cmd">python</span> scripts/run_backtest.py --strategy ob_bos --trailing hibrido --timeframe 15m --dias 180 --windows 8-11</pre>
+  </div>
+</div>
+
+
+<!-- 6 -->
+<div class="section" id="s6">
+  <div class="section-header">
+    <span class="section-num">06</span>
+    <span class="section-title">Plan de pruebas: Parámetros de riesgo</span>
+  </div>
+
+  <h3>Test 6.1 — Barrido de RR ratio</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18 --rr 1.5
+<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18 --rr 2.0
+<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18 --rr 2.5
+<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18 --rr 3.0
+<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18 --rr 4.0</pre>
+  </div>
+
+  <h3>Test 6.2 — Barrido de score mínimo</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18 --score 40
+<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18 --score 50
+<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18 --score 65
+<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18 --score 75</pre>
+  </div>
+
+  <h3>Test 6.3 — Cooldown post-SL</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --cooldown 0
+<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --cooldown 3
+<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --cooldown 5
+<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --cooldown 10</pre>
+  </div>
+</div>
+
+
+<!-- 7 -->
+<div class="section" id="s7">
+  <div class="section-header">
+    <span class="section-num">07</span>
+    <span class="section-title">Plan de pruebas: Multi-trade</span>
+  </div>
+
+  <h3>Test 7.1 — 1 vs 2 vs 3 trades</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --max-trades 1 --windows 8-11,13-18
+<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --max-trades 2 --windows 8-11,13-18
+<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --max-trades 3 --windows 8-11,13-18</pre>
+  </div>
+
+  <h3>Test 7.2 — Racha de SL: 2 vs 3 vs 5 para reducir</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --max-trades 2 --racha-reduce 2
+<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --max-trades 2 --racha-reduce 3
+<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --max-trades 2 --racha-reduce 5</pre>
+  </div>
+
+  <h3>Test 7.3 — Multi-trade en 15m (más señales simultáneas)</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python</span> scripts/run_backtest.py --timeframe 15m --dias 180 --max-trades 1 --windows 8-11,13-18
+<span class="cmd">python</span> scripts/run_backtest.py --timeframe 15m --dias 180 --max-trades 2 --windows 8-11,13-18</pre>
+  </div>
+</div>
+
+
+<!-- 8 -->
+<div class="section" id="s8">
+  <div class="section-header">
+    <span class="section-num">08</span>
+    <span class="section-title">Mega-comparación: comandos listos para copiar</span>
+  </div>
+
+  <p>Comandos encadenados con <code>&&</code> para correr uno tras otro. Cada grupo tarda entre 5–30 minutos según los días.</p>
+
+  <h3>Batch 1: ETH/1h ventanas horarias (360 días)</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 1h --dias 360 --windows 8-11 && <span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 1h --dias 360 --windows 13-18 && <span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 1h --dias 360 --windows 8-11,13-18 && <span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 1h --dias 360 --windows ""</pre>
+  </div>
+
+  <h3>Batch 2: ETH/15m ventanas horarias (180 días)</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows 8-11 && <span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows 13-18 && <span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows 8-11,13-18 && <span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows ""</pre>
+  </div>
+
+  <h3>Batch 3: Systematic completo ETH/1h con ventanas (360 días)</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python</span> scripts/run_systematic.py --symbol ETHUSDT --timeframe 1h --dias 360 --max-trades 2 --windows 8-11,13-18</pre>
+  </div>
+
+  <h3>Batch 4: Comparación 15m ventanas granulares (180 días)</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python</span> scripts/run_backtest.py --timeframe 15m --dias 180 --windows 7-9 && <span class="cmd">python</span> scripts/run_backtest.py --timeframe 15m --dias 180 --windows 9-11 && <span class="cmd">python</span> scripts/run_backtest.py --timeframe 15m --dias 180 --windows 11-13 && <span class="cmd">python</span> scripts/run_backtest.py --timeframe 15m --dias 180 --windows 13-15 && <span class="cmd">python</span> scripts/run_backtest.py --timeframe 15m --dias 180 --windows 15-17 && <span class="cmd">python</span> scripts/run_backtest.py --timeframe 15m --dias 180 --windows 17-19</pre>
+  </div>
+
+  <h3>Batch 5: RR sweep en la mejor config</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18 --max-trades 2 --rr 1.5 && <span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18 --max-trades 2 --rr 2.0 && <span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18 --max-trades 2 --rr 2.5 && <span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18 --max-trades 2 --rr 3.0</pre>
+  </div>
+</div>
+
+
+<!-- 9 -->
+<div class="section" id="s9">
+  <div class="section-header">
+    <span class="section-num">09</span>
+    <span class="section-title">Cómo interpretar los resultados</span>
+  </div>
+
+  <h3>Métricas clave (en orden de importancia)</h3>
+  <table>
+    <tr><th>Métrica</th><th>Qué buscar</th><th>Red flag</th></tr>
+    <tr><td><strong>Profit Factor</strong></td><td>≥ 1.3 es bueno, ≥ 1.5 excelente</td><td>&lt; 1.0 pierde dinero</td></tr>
+    <tr><td><strong>Win Rate</strong></td><td>35–55% con RR 1:2 es viable</td><td>&lt; 25% con cualquier RR</td></tr>
+    <tr><td><strong>Total trades</strong></td><td>≥ 50 para ser estadísticamente confiable</td><td>&lt; 20 trades = no confiar</td></tr>
+    <tr><td><strong>Max Drawdown</strong></td><td>≤ 15% es cómodo, ≤ 10% ideal</td><td>&gt; 30% es peligroso</td></tr>
+    <tr><td><strong>Retorno</strong></td><td>Relativo al DD. Retorno/DD &gt; 2 es bueno</td><td>Alto retorno con alto DD = suerte</td></tr>
+  </table>
+
+  <h3>Señales de sobreajuste (overfitting)</h3>
+  <p>Si una configuración da resultados espectaculares en 90 días pero mediocres en 360 días, es sobreajuste. Siempre validá con el período más largo posible.</p>
+
+  <div class="alert alert-warn">
+    <strong>Regla de oro</strong>
+    Preferí configuraciones con PF alto y DD bajo sobre configuraciones con retorno alto y DD alto. Un PF de 1.5 con DD 10% es mucho mejor que un PF de 1.2 con DD 30%, aunque el segundo tenga más retorno bruto.
+  </div>
+
+  <h3>Flujo recomendado de testing</h3>
+  <ol style="padding-left: 20px; margin: 12px 0;">
+    <li style="margin-bottom: 8px;">Correr <strong>Batch 1</strong> (ventanas en 1h) → encontrar la mejor ventana</li>
+    <li style="margin-bottom: 8px;">Correr <strong>Batch 2</strong> (ventanas en 15m) → comparar con 1h</li>
+    <li style="margin-bottom: 8px;">Con la mejor ventana, correr <strong>Batch 3</strong> (systematic completo)</li>
+    <li style="margin-bottom: 8px;">Afinar con <strong>Batch 4</strong> (ventanas granulares) si 15m es mejor</li>
+    <li style="margin-bottom: 8px;">Confirmar RR con <strong>Batch 5</strong></li>
+    <li style="margin-bottom: 8px;">Configurar el bot con los parámetros ganadores</li>
+  </ol>
+</div>
+
+
+<!-- 10 -->
+<div class="section" id="s10">
+  <div class="section-header">
+    <span class="section-num">10</span>
+    <span class="section-title">Comparar resultados: compare_results.py</span>
+  </div>
+
+  <p>Después de correr múltiples backtests, usá este script para comparar todos los resultados en una tabla con colores y ranking automático.</p>
+
+  <table>
+    <tr><th>Parámetro</th><th>Valores</th><th>Default</th><th>Descripción</th></tr>
+    <tr><td><code>files</code></td><td>patrones glob</td><td>todos</td><td>Archivos JSON a comparar. Soporta wildcards (<code>bt_ethusdt*.json</code>)</td></tr>
+    <tr><td><code>--dir</code></td><td>ruta</td><td>backtest/results</td><td>Directorio donde buscar JSONs</td></tr>
+    <tr><td><code>--top</code></td><td>1–100</td><td>todos</td><td>Mostrar solo los N mejores resultados</td></tr>
+    <tr><td><code>--sort</code></td><td><code>ret</code>, <code>pf</code>, <code>wr</code>, <code>dd</code>, <code>trades</code>, <code>sharpe</code></td><td>ret</td><td>Métrica para ordenar</td></tr>
+    <tr><td><code>--min-trades</code></td><td>1–1000</td><td>0</td><td>Filtrar resultados con menos de N trades</td></tr>
+    <tr><td><code>--csv</code></td><td>nombre.csv</td><td>—</td><td>Exportar comparación a CSV</td></tr>
+  </table>
+
+  <h3>Comparar todos los backtests</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python</span> scripts/compare_results.py</pre>
+  </div>
+
+  <h3>Top 5 ordenados por Profit Factor</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python</span> scripts/compare_results.py --top 5 --sort pf</pre>
+  </div>
+
+  <h3>Solo resultados confiables (50+ trades), menor drawdown primero</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python</span> scripts/compare_results.py --min-trades 50 --sort dd</pre>
+  </div>
+
+  <h3>Comparar solo los de ETH/1h</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python</span> scripts/compare_results.py bt_ethusdt_1h*.json</pre>
+  </div>
+
+  <h3>Comparar solo los de 15m con ventanas</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python</span> scripts/compare_results.py bt_ethusdt_15m*w*.json</pre>
+  </div>
+
+  <h3>Exportar a CSV para Excel</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python</span> scripts/compare_results.py --csv comparacion.csv</pre>
+  </div>
+
+  <h3>Flujo completo recomendado</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="comment"># 1. Correr backtests con diferentes configs</span>
+<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11
+<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 13-18
+<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18
+<span class="cmd">python</span> scripts/run_backtest.py --timeframe 15m --dias 180 --windows 8-11,13-18
+
+<span class="comment"># 2. Comparar todos los resultados</span>
+<span class="cmd">python</span> scripts/compare_results.py --sort pf --min-trades 30
+
+<span class="comment"># 3. Ver solo el top 3</span>
+<span class="cmd">python</span> scripts/compare_results.py --top 3 --sort pf</pre>
+  </div>
+
+  <div class="alert alert-ok">
+    <strong>Tip</strong>
+    La tabla muestra colores automáticos: verde para métricas buenas, amarillo para mediocres, rojo para malas. PF ≥ 1.3 es verde, WR ≥ 40% es verde, DD ≤ 10% es verde.
+  </div>
+</div>
+
+
+<footer>
+  <span>SMC Futures Bot · Guía de Backtesting v1.0</span>
+  <span>run_backtest.py · run_systematic.py · compare_results.py</span>
+</footer>
+
+</div><!-- /page -->
+
+<script>
+function copiar(btn) {
+  var pre = btn.parentElement.querySelector('pre');
+  var texto = pre.innerText;
+  navigator.clipboard.writeText(texto).then(function() {
+    btn.textContent = '✓ copiado';
+    btn.classList.add('copied');
+    setTimeout(function() {
+      btn.textContent = 'copiar';
+      btn.classList.remove('copied');
+    }, 2000);
+  }).catch(function() {
+    btn.textContent = 'error';
+    setTimeout(function() { btn.textContent = 'copiar'; }, 2000);
+  });
+}
+</script>
+</body>
+</html>

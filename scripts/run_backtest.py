@@ -39,7 +39,7 @@ logger = get_logger("run_backtest")
 
 GREEN  = "\033[32m"; RED   = "\033[31m"
 YELLOW = "\033[33m"; CYAN  = "\033[36m"
-BOLD   = "\033[1m";  RESET = "\033[0m"
+BOLD   = "\033[1m";  DIM   = "\033[2m"; RESET = "\033[0m"
 
 
 # ══════════════════════════════════════════════════════════
@@ -55,8 +55,8 @@ Ejemplos:
   python scripts/run_backtest.py
   python scripts/run_backtest.py --strategy ob_bos
   python scripts/run_backtest.py --trailing escalones
+  python scripts/run_backtest.py --windows 8-11,13-18
   python scripts/run_backtest.py --compare
-  python scripts/run_backtest.py --compare --profiles base ob_bos
   python scripts/run_backtest.py --compare-trailing
   python scripts/run_backtest.py --list-profiles
         """
@@ -86,9 +86,26 @@ Ejemplos:
                    help="Máximo de trades simultáneos (default: 1)")
     p.add_argument("--racha-reduce",  type=int,   default=3,
                    help="Tras N SL seguidos, reducir a 1 trade (default: 3)")
+    p.add_argument("--windows",       default=None,
+                   help="Ventanas horarias UTC. Ej: 8-11,13-18 (override .env)")
+    p.add_argument("--score",         type=int, default=None,
+                   help="Score mínimo (override .env)")
+    p.add_argument("--rr",            type=float, default=None,
+                   help="TP/RR ratio (override .env). Ej: 2.0, 3.0")
     p.add_argument("--output",        default=None,
                    help="Nombre del archivo de salida JSON")
-    return p.parse_args()
+    args = p.parse_args()
+
+    # Override parámetros del .env si se pasaron por CLI
+    from config import strategy as _strat, risk as _risk
+    if args.windows is not None:
+        _strat.TRADING_WINDOWS_RAW = args.windows
+    if args.score is not None:
+        _strat.SCORE_MINIMO = args.score
+    if args.rr is not None:
+        _risk.TP_RR_RATIO = args.rr
+
+    return args
 
 
 # ══════════════════════════════════════════════════════════
@@ -145,7 +162,11 @@ def mostrar_stats(r: BacktestStats, verbose: bool = True):
     if r.avg_rr_real > 0:
         print(f"  Avg RR Real:    {GREEN}{r.avg_rr_real:.1f}R{RESET}  |  Max R Capturado: {GREEN}{r.max_r_capturado:.1f}R{RESET}")
     if r.señales_filtradas:
-        print(f"  Señales filtradas por perfil: {YELLOW}{r.señales_filtradas}{RESET}")
+        print(f"  Señales filtradas: {YELLOW}{r.señales_filtradas}{RESET}")
+        if hasattr(r, 'motivos_filtro') and r.motivos_filtro:
+            for motivo, count in sorted(r.motivos_filtro.items(), key=lambda x: x[1], reverse=True):
+                pct = count / r.señales_filtradas * 100
+                print(f"    {DIM}· {motivo}: {count} ({pct:.0f}%){RESET}")
 
 
 def mostrar_comparacion(resultados: list[BacktestStats]):
@@ -218,12 +239,22 @@ def main():
         print(f"\n  Uso: python scripts/run_backtest.py --strategy NOMBRE\n")
         return
 
+    # Mostrar windows activas
+    from config import strategy as scfg
+    from config.settings import parse_trading_windows
+    windows = parse_trading_windows(scfg.TRADING_WINDOWS_RAW)
+    win_str = scfg.TRADING_WINDOWS_RAW if scfg.TRADING_WINDOWS_RAW.strip() else "24h (sin filtro)"
+
     print(f"\n{'═'*60}")
     print(f"{'  SMC BACKTEST ENGINE':^60}")
     print(f"{'═'*60}")
     print(f"  Par:       {args.symbol} / {args.timeframe}")
     print(f"  Capital:   ${args.capital:,.0f} USDT")
     print(f"  Período:   {args.dias} días")
+    print(f"  Windows:   {win_str}")
+    print(f"  Max trades:{args.max_trades}")
+    if args.rr:
+        print(f"  RR:        1:{args.rr}")
 
     # Cargar datos UNA sola vez (se reusan en el modo comparación)
     print(f"\n  Cargando datos históricos...")
@@ -333,6 +364,12 @@ def main():
         else:
             parts = ["bt", args.symbol.lower(), args.timeframe, nombre, args.trailing,
                      f"{args.dias}d", f"mt{args.max_trades}"]
+            if args.windows:
+                parts.append(f"w{args.windows.replace(',','_')}")
+            if args.rr:
+                parts.append(f"rr{args.rr}")
+            if args.score:
+                parts.append(f"sc{args.score}")
             output = "_".join(parts) + ".json"
         path   = exportar_json(stats, output)
         print(f"\n  JSON exportado: {path}")

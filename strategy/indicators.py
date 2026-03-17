@@ -8,6 +8,7 @@ Funciones sin estado, solo transforman DataFrames.
 import pandas as pd
 import numpy as np
 from config import strategy as cfg
+from config.settings import parse_trading_windows
 
 
 # ══════════════════════════════════════════════════════════
@@ -141,16 +142,10 @@ def en_ventana_horaria(timestamp) -> bool:
     True si la hora del timestamp cae dentro de alguna ventana
     de trading configurada en TRADING_WINDOWS.
     Si no hay ventanas configuradas, retorna True (sin filtro).
-
-    Ejemplo: TRADING_WINDOWS=8-11,13-18
-      08:00 → True (apertura London)
-      12:00 → False (entre ventanas)
-      15:00 → True (core NY)
-      20:00 → False (fuera de horario)
     """
-    windows = cfg.trading_windows()
+    windows = parse_trading_windows(cfg.TRADING_WINDOWS_RAW)
     if not windows:
-        return True  # Sin filtro horario
+        return True
 
     hora = timestamp.hour if hasattr(timestamp, 'hour') else pd.Timestamp(timestamp).hour
 
@@ -162,7 +157,7 @@ def en_ventana_horaria(timestamp) -> bool:
 
 def descripcion_ventana_horaria(timestamp) -> str:
     """Retorna descripción legible de la ventana actual o 'fuera de horario'."""
-    windows = cfg.trading_windows()
+    windows = parse_trading_windows(cfg.TRADING_WINDOWS_RAW)
     if not windows:
         return "24h"
 

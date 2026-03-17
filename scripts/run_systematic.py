@@ -55,9 +55,16 @@ def parse_args():
                    help="Máximo de trades simultáneos (default: 1)")
     p.add_argument("--racha-reduce",  type=int,   default=3,
                    help="Tras N SL seguidos, reducir a 1 trade (default: 3)")
+    p.add_argument("--windows",       default=None,
+                   help="Ventanas horarias UTC. Ej: 8-11,13-18 (override .env)")
     p.add_argument("--output",        default=None,
                    help="Nombre del JSON de salida (auto-generado si no se pasa)")
     args = p.parse_args()
+
+    # Override ventanas horarias si se pasó por CLI
+    if args.windows is not None:
+        from config import strategy as _strat
+        _strat.TRADING_WINDOWS_RAW = args.windows
 
     # Generar nombre de output descriptivo si no se pasó
     if args.output is None:
@@ -68,6 +75,8 @@ def parse_args():
             parts.append(args.timeframe)
         parts.append(f"{args.dias}d")
         parts.append(f"mt{args.max_trades}")
+        if args.windows:
+            parts.append(f"w{args.windows.replace(',','_')}")
         args.output = "_".join(parts) + ".json"
 
     return args
