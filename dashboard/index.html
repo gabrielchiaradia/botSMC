@@ -993,7 +993,7 @@ function renderKPIs(d, retPct) {
     { label:'Avg Loss',       value:`$${d.avg_loss_usd}`, cls:'kpi-red' },
     { label:'Mejor Trade',    value:`$${d.mejor_trade_usd}`, cls:'kpi-green' },
     { label:'Peor Trade',     value:`$${d.peor_trade_usd}`, cls:'kpi-red' },
-    { label:'Avg Duración',   value:`${d.avg_duracion_min}m`, cls:'kpi-accent' },
+    { label:'Avg Duración',   value: formatDuration(d.avg_duracion_min), cls:'kpi-accent' },
     { label:'Racha Wins',     value:d.racha_wins, cls:'kpi-green', sub:'consecutivos' },
     { label:'Racha Losses',   value:d.racha_losses, cls:'kpi-red', sub:'consecutivos' },
   ];
@@ -1266,6 +1266,19 @@ function renderSessions(d) {
 var allTrades = [];
 var _originalTrades = [];
 
+function formatDuration(mins) {
+  mins = Math.round(mins);
+  if (mins < 60) return mins + 'm';
+  var d = Math.floor(mins / 1440);
+  var h = Math.floor((mins % 1440) / 60);
+  var m = mins % 60;
+  var parts = [];
+  if (d > 0) parts.push(d + 'd');
+  if (h > 0) parts.push(h + 'h');
+  if (m > 0) parts.push(m + 'm');
+  return parts.join(' ');
+}
+
 // Estado del sort de trades
 let _tradeSortCol = null;
 let _tradeSortAsc = false;
@@ -1366,7 +1379,7 @@ function renderTradesTable(trades, isOriginal) {
       + '<td style="color:var(--muted)">' + tam.toFixed(4) + '</td>'
       + '<td class="' + pnlC + '">' + pnlSign + '$' + pnlUsd.toFixed(2) + '</td>'
       + '<td class="' + pnlC + '">' + pnlSign + pnlPct.toFixed(2) + '%</td>'
-      + '<td style="color:var(--muted)">' + dur + 'm</td>'
+      + '<td style="color:var(--muted)">' + formatDuration(dur) + '</td>'
       + '<td><span class="badge badge-sesion">' + ses + '</span></td>'
       + '<td style="color:var(--yellow)">' + score + '</td>'
       + '<td><span class="badge badge-' + resClass + '">' + res + '</span></td>'
