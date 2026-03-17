@@ -186,33 +186,38 @@ class TelegramNotifier:
             return False
 
         url  = self.BASE_URL.format(token=self.token, method="sendMessage")
-        data = json.dumps({
-            "chat_id":    self.chat_id,
-            "text":       texto,
-            "parse_mode": parse_mode,
-        }).encode("utf-8")
 
-        req = urllib.request.Request(
-            url,
-            data    = data,
-            headers = {"Content-Type": "application/json"},
-            method  = "POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                resultado = json.loads(resp.read().decode())
-                if resultado.get("ok"):
-                    logger.debug("Telegram OK: %s", texto[:60])
-                    return True
-                else:
-                    logger.warning("Telegram error: %s", resultado)
-                    return False
-        except urllib.error.URLError as e:
-            logger.warning("Telegram no disponible: %s", e)
-            return False
-        except Exception as e:
-            logger.warning("Error enviando Telegram: %s", e)
-            return False
+        for modo in [parse_mode, None]:
+            payload = {
+                "chat_id": self.chat_id,
+                "text":    texto,
+            }
+            if modo:
+                payload["parse_mode"] = modo
+
+            data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(
+                url,
+                data    = data,
+                headers = {"Content-Type": "application/json"},
+                method  = "POST",
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    resultado = json.loads(resp.read().decode())
+                    if resultado.get("ok"):
+                        logger.debug("Telegram OK: %s", texto[:60])
+                        return True
+                    else:
+                        logger.warning("Telegram error: %s", resultado)
+            except urllib.error.URLError as e:
+                if modo and "Bad Request" in str(e):
+                    logger.debug("Markdown falló, reintentando sin parseo...")
+                    continue
+                logger.warning("Telegram no disponible: %s", e)
+                return False
+
+        return False
 
     def test_conexion(self) -> bool:
         """Verifica que el token y chat_id sean válidos."""
