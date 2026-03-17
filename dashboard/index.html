@@ -285,6 +285,10 @@
   #comparison-table .best-row td:first-child {
     border-left: 3px solid var(--green);
   }
+  #comparison-table thead th { cursor: pointer; user-select: none; position: relative; padding-right: 18px; }
+  #comparison-table thead th:hover { color: var(--accent); }
+  #comparison-table thead th.sort-asc::after  { content: ' ▲'; font-size: 9px; color: var(--accent); }
+  #comparison-table thead th.sort-desc::after { content: ' ▼'; font-size: 9px; color: var(--accent); }
   .comp-best { color: var(--green); font-weight: 700; }
   .comp-worst { color: var(--red); opacity: 0.7; }
   .comp-back-btn {
@@ -738,42 +742,81 @@ function mostrarDashboardNormal(data) {
   renderTradesTable(data.trades || [], true);
 }
 
+// Estado del sort
+let _compSortCol = 'retorno';
+let _compSortAsc = false;  // default: mayor primero
+
+const COMP_COLUMNS = [
+  { key: 'symbol',      label: 'Symbol',   get: p => p.symbol || '',           fmt: v => v || '—',                   numeric: false },
+  { key: 'timeframe',   label: 'TF',       get: p => p.timeframe || '',        fmt: v => v || '—',                   numeric: false },
+  { key: 'perfil',      label: 'Perfil',   get: p => p.perfil || '',           fmt: v => v || '—',                   numeric: false },
+  { key: 'trailing',    label: 'Trailing',  get: p => p.trailing_mode || 'none', fmt: v => v,                        numeric: false },
+  { key: 'rr',          label: 'RR',       get: p => p.tp_rr_ratio || 0,       fmt: v => v ? '1:' + v : '—',        numeric: true },
+  { key: 'retorno',     label: 'Retorno',  get: p => (p.capital_final - p.capital_inicial) / p.capital_inicial * 100, fmt: v => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`, numeric: true },
+  { key: 'win_rate',    label: 'Win Rate', get: p => p.win_rate || 0,          fmt: v => v.toFixed(0) + '%',          numeric: true },
+  { key: 'pf',          label: 'PF',       get: p => p.profit_factor || 0,     fmt: v => v.toFixed(2),                numeric: true },
+  { key: 'trades',      label: 'Trades',   get: p => p.total_trades || 0,      fmt: v => v,                           numeric: true },
+  { key: 'dd',          label: 'DD%',      get: p => p.max_drawdown_pct || 0,  fmt: v => v.toFixed(1) + '%',          numeric: true },
+  { key: 'sharpe',      label: 'Sharpe',   get: p => p.sharpe_ratio || 0,      fmt: v => v.toFixed(2),                numeric: true },
+];
+
 function renderComparacionTable(perfiles) {
   const thead = document.getElementById('comparison-thead');
   const tbody = document.getElementById('comparison-tbody');
 
-  // Encontrar el mejor retorno para destacar
-  const retornos = perfiles.map(p =>
-    ((p.capital_final - p.capital_inicial) / p.capital_inicial * 100));
-  const mejorRet = Math.max(...retornos);
+  // Header con sort indicators
+  thead.innerHTML = '<th>#</th>' + COMP_COLUMNS.map(col => {
+    const cls = _compSortCol === col.key ? (_compSortAsc ? 'sort-asc' : 'sort-desc') : '';
+    return `<th class="${cls}" onclick="sortComparacion('${col.key}')">${col.label}</th>`;
+  }).join('');
 
-  thead.innerHTML = `
-    <th>#</th><th>Symbol</th><th>TF</th><th>Perfil</th><th>Trailing</th>
-    <th>RR</th><th>Retorno</th><th>Win Rate</th><th>PF</th>
-    <th>Trades</th><th>DD%</th><th>Sharpe</th>
-  `;
+  // Preparar datos con índice original (para onclick)
+  const datos = perfiles.map((p, origIdx) => {
+    const row = { _origIdx: origIdx };
+    COMP_COLUMNS.forEach(col => { row[col.key] = col.get(p); });
+    return row;
+  });
 
-  tbody.innerHTML = perfiles.map((p, i) => {
-    const ret = retornos[i];
-    const isBest = ret === mejorRet;
-    const retClass = ret >= 0 ? 'pnl-pos' : 'pnl-neg';
+  // Ordenar
+  const col = COMP_COLUMNS.find(c => c.key === _compSortCol);
+  if (col) {
+    datos.sort((a, b) => {
+      const va = a[col.key], vb = b[col.key];
+      let cmp = col.numeric ? va - vb : String(va).localeCompare(String(vb));
+      return _compSortAsc ? cmp : -cmp;
+    });
+  }
+
+  // Mejor retorno para destacar
+  const mejorRet = Math.max(...datos.map(d => d.retorno));
+
+  tbody.innerHTML = datos.map((d, i) => {
+    const isBest = d.retorno === mejorRet;
+    const retClass = d.retorno >= 0 ? 'pnl-pos' : 'pnl-neg';
     const rowClass = isBest ? 'best-row' : '';
 
-    return `<tr class="${rowClass}" onclick="cargarPerfilDesdeComparacion(${i})" title="Click para ver dashboard completo">
-      <td>${i + 1}</td>
-      <td>${p.symbol || '—'}</td>
-      <td>${p.timeframe || '—'}</td>
-      <td>${p.perfil || '—'}</td>
-      <td>${p.trailing_mode || 'none'}</td>
-      <td>${p.tp_rr_ratio ? '1:' + p.tp_rr_ratio : '—'}</td>
-      <td class="${retClass}">${ret >= 0 ? '+' : ''}${ret.toFixed(1)}%</td>
-      <td>${(p.win_rate || 0).toFixed(0)}%</td>
-      <td>${(p.profit_factor || 0).toFixed(2)}</td>
-      <td>${p.total_trades || 0}</td>
-      <td>${(p.max_drawdown_pct || 0).toFixed(1)}%</td>
-      <td>${(p.sharpe_ratio || 0).toFixed(2)}</td>
+    const cells = COMP_COLUMNS.map(col => {
+      const val = d[col.key];
+      const formatted = col.fmt(val);
+      const cls = col.key === 'retorno' ? retClass : '';
+      return `<td class="${cls}">${formatted}</td>`;
+    }).join('');
+
+    return `<tr class="${rowClass}" onclick="cargarPerfilDesdeComparacion(${d._origIdx})" title="Click para ver dashboard completo">
+      <td>${i + 1}</td>${cells}
     </tr>`;
   }).join('');
+}
+
+function sortComparacion(colKey) {
+  if (_compSortCol === colKey) {
+    _compSortAsc = !_compSortAsc;
+  } else {
+    _compSortCol = colKey;
+    const col = COMP_COLUMNS.find(c => c.key === colKey);
+    _compSortAsc = col && !col.numeric;  // texto asc, números desc por default
+  }
+  if (_comparacionData) renderComparacionTable(_comparacionData.perfiles);
 }
 
 function cargarPerfilDesdeComparacion(idx) {
