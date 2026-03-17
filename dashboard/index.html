@@ -402,6 +402,34 @@
   .file-btn .type-live  { background: rgba(0,230,118,0.15); color: var(--green); }
   .file-btn .type-bt    { background: rgba(0,212,255,0.15); color: var(--accent); }
   .no-server-files { color: var(--muted); font-size: 11px; font-style: italic; }
+
+  /* ─── OPEN POSITIONS ─── */
+  .open-positions { margin-bottom: 24px; }
+  .open-positions h2 { font-family: 'Syne', sans-serif; font-size: 14px; margin-bottom: 12px; }
+  .pos-grid { display: flex; gap: 12px; flex-wrap: wrap; }
+  .pos-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 18px; min-width: 260px; flex: 1;
+    position: relative; overflow: hidden;
+  }
+  .pos-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  }
+  .pos-card.pos-long::before  { background: var(--green); }
+  .pos-card.pos-short::before { background: var(--red); }
+  .pos-card .pos-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 8px;
+  }
+  .pos-card .pos-dir { font-weight: 700; font-size: 13px; }
+  .pos-card .pos-dir.long  { color: var(--green); }
+  .pos-card .pos-dir.short { color: var(--red); }
+  .pos-card .pos-bot-tag { font-size: 9px; color: var(--muted); background: var(--surface2);
+    padding: 2px 6px; border-radius: 3px; }
+  .pos-card .pos-detail { font-size: 11px; color: var(--muted); line-height: 1.8; }
+  .pos-card .pos-detail span { color: var(--text); }
+  .pos-empty { color: var(--muted); font-size: 11px; font-style: italic; padding: 8px 0; }
+
   .auto-refresh-badge {
     display: inline-flex; align-items: center; gap: 5px;
     font-size: 10px; color: var(--green);
@@ -439,6 +467,16 @@
 
 <main>
 
+
+  <!-- OPEN POSITIONS (solo visible cuando se accede desde el VPS) -->
+  <div class="open-positions" id="open-positions-section" style="display:none">
+    <h2>⚡ Posiciones Abiertas
+      <button class="btn-reload" onclick="renderOpenPositions()" title="Recargar">⟳</button>
+    </h2>
+    <div class="pos-grid" id="open-positions-grid">
+      <span class="pos-empty">Cargando...</span>
+    </div>
+  </div>
 
   <!-- LIVE FILES (solo visible cuando se accede desde el VPS) -->
   <div class="server-files" id="live-files-section" style="display:none">
@@ -1352,10 +1390,76 @@ setInterval(async () => {
 }, 60000);
 
 // Arrancar al cargar la página
+// ═══════════════════════════════════════════
+//  OPEN POSITIONS
+// ═══════════════════════════════════════════
+async function renderOpenPositions() {
+  if (!EN_SERVIDOR) return;
+  document.getElementById('open-positions-section').style.display = 'block';
+
+  const grid = document.getElementById('open-positions-grid');
+  const allPositions = [];
+
+  // Buscar open_positions.json y open_positions_N.json
+  try {
+    const r = await fetch('/api/logs/?t=' + Date.now(), { cache: 'no-store' });
+    if (r.ok) {
+      const items = await r.json();
+      const posFiles = items.filter(i => i.name && i.name.startsWith('open_positions') && i.name.endsWith('.json'));
+      for (const pf of posFiles) {
+        try {
+          const r2 = await fetch('/api/logs/' + pf.name + '?t=' + Date.now(), { cache: 'no-store' });
+          if (r2.ok) {
+            const data = await r2.json();
+            if (data.posiciones) {
+              for (const pos of data.posiciones) {
+                pos._bot_tag = data.bot_tag || `Bot${data.bot_num || 1}`;
+                pos._timeframe = data.timeframe;
+                pos._modo = data.modo;
+                allPositions.push(pos);
+              }
+            }
+          }
+        } catch {}
+      }
+    }
+  } catch {}
+
+  if (allPositions.length === 0) {
+    grid.innerHTML = '<span class="pos-empty">Sin posiciones abiertas</span>';
+    return;
+  }
+
+  grid.innerHTML = allPositions.map(p => {
+    const isLong = p.direccion === 'LONG';
+    const dirClass = isLong ? 'long' : 'short';
+    const emoji = isLong ? '🟢' : '🔴';
+    const ts = p.timestamp_in ? p.timestamp_in.slice(0, 16).replace('T', ' ') : '';
+
+    return `<div class="pos-card pos-${dirClass}">
+      <div class="pos-header">
+        <span class="pos-dir ${dirClass}">${emoji} ${p.direccion}</span>
+        <span class="pos-bot-tag">${p._bot_tag}</span>
+      </div>
+      <div class="pos-detail">
+        ${p.symbol} · ${p._timeframe}<br>
+        Entrada: <span>$${p.precio_entrada?.toLocaleString('en', {minimumFractionDigits: 2})}</span><br>
+        SL: <span>$${p.stop_loss?.toLocaleString('en', {minimumFractionDigits: 2})}</span> · 
+        TP: <span>$${p.take_profit?.toLocaleString('en', {minimumFractionDigits: 2})}</span><br>
+        Score: <span>${p.score_señal}</span> · ${p._modo}<br>
+        <span style="font-size:9px;color:var(--muted)">${ts}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 if (EN_SERVIDOR) {
   document.addEventListener('DOMContentLoaded', () => {
+    renderOpenPositions();
     renderServerFiles();
-    // Re-escanear cada 5 minutos por si apareció un archivo nuevo
+    // Refresh posiciones cada 30 segundos
+    setInterval(renderOpenPositions, 30000);
+    // Re-escanear archivos cada 5 minutos
     setInterval(renderServerFiles, 300000);
   });
 }

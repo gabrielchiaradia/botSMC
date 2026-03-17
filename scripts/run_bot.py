@@ -275,6 +275,22 @@ def exportar_dashboard(journal):
     except OSError as e:
         logger.warning("No se pudo exportar dashboard: %s", e)
 
+    # Exportar posiciones abiertas
+    exportar_posiciones_abiertas(journal)
+
+
+def exportar_posiciones_abiertas(journal):
+    """Escribe las posiciones abiertas actuales a un JSON para el dashboard."""
+    lcfg.LOG_DIR.mkdir(parents=True, exist_ok=True)
+    suffix = f"_{journal._bot_num}" if journal._bot_num > 1 else ""
+    path = lcfg.LOG_DIR / f"open_positions{suffix}.json"
+    try:
+        datos = journal.exportar_posiciones_abiertas()
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(datos, f, ensure_ascii=False, indent=2, default=str)
+    except OSError as e:
+        logger.warning("No se pudo exportar posiciones abiertas: %s", e)
+
 
 # ══════════════════════════════════════════════════════════
 #  RESUMEN FINAL

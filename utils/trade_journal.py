@@ -331,11 +331,40 @@ class TradeJournal:
             "win_rate": round(wr, 1),
         }
 
+    def exportar_posiciones_abiertas(self) -> dict:
+        """Exporta las posiciones abiertas actuales como dict para JSON."""
+        from datetime import datetime
+        posiciones = []
+        for t in self._trades_abiertos:
+            posiciones.append({
+                "id":             t.id,
+                "symbol":         t.symbol,
+                "timeframe":      t.timeframe,
+                "direccion":      t.direccion,
+                "precio_entrada": t.precio_entrada,
+                "stop_loss":      t.stop_loss,
+                "take_profit":    t.take_profit,
+                "tamaño":         t.tamaño,
+                "capital_in":     t.capital_in,
+                "score_señal":    t.score_señal,
+                "sesion":         t.sesion,
+                "timestamp_in":   t.timestamp_in,
+                "atr_entrada":    t.atr_entrada,
+                "modo":           t.modo,
+            })
+        return {
+            "bot_tag":       self.bot_tag,
+            "bot_num":       self._bot_num,
+            "symbol":        self.symbol,
+            "timeframe":     self.timeframe,
+            "modo":          self.modo,
+            "num_abiertas":  len(posiciones),
+            "max_trades":    self.max_open,
+            "posiciones":    posiciones,
+            "updated_at":    datetime.now().isoformat(),
+        }
+
     def exportar_como_backtest(self) -> dict:
-        """
-        Convierte los trades del día a formato compatible
-        con el dashboard del backtest para visualizarlos.
-        """
         trades_raw = self.leer_trades_hoy()
         if not trades_raw:
             return {}
