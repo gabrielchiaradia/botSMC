@@ -105,17 +105,19 @@
   #file-input { display:none; }
   .upload-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.6; }
 
-  /* Demo button */
-  .btn-demo {
-    margin-top: 20px;
-    padding: 10px 24px;
-    background: linear-gradient(135deg, var(--accent2), var(--accent));
-    border: none; border-radius: 8px; color: #fff;
+  /* Reload button */
+  .btn-reload {
+    padding: 4px 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--accent);
     font-family: 'JetBrains Mono', monospace;
-    font-size: 12px; cursor: pointer; font-weight: 600;
-    transition: opacity 0.2s; letter-spacing: 0.05em;
+    font-size: 11px; cursor: pointer; font-weight: 600;
+    transition: all 0.2s; letter-spacing: 0.05em;
+    margin-left: 12px; vertical-align: middle;
   }
-  .btn-demo:hover { opacity: 0.85; }
+  .btn-reload:hover { background: var(--accent); color: var(--bg); }
 
   /* ─── DASHBOARD (hidden by default) ─── */
   #dashboard { display: none; }
@@ -337,7 +339,6 @@
   .file-btn .file-type { font-size: 9px; padding: 1px 5px; border-radius: 3px; }
   .file-btn .type-live  { background: rgba(0,230,118,0.15); color: var(--green); }
   .file-btn .type-bt    { background: rgba(0,212,255,0.15); color: var(--accent); }
-  .file-btn .type-demo  { background: rgba(255,214,0,0.15);  color: var(--yellow); }
   .no-server-files { color: var(--muted); font-size: 11px; font-style: italic; }
   .auto-refresh-badge {
     display: inline-flex; align-items: center; gap: 5px;
@@ -383,6 +384,7 @@
       <span class="auto-refresh-badge" id="refresh-badge">
         <span class="status-dot"></span>Auto-refresh 60s
       </span>
+      <button class="btn-reload" onclick="renderServerFiles()" title="Recargar lista de archivos">⟳ Recargar</button>
     </h2>
     <p>Resultados disponibles en el VPS — click para cargar</p>
     <div class="file-list" id="server-file-list">
@@ -396,10 +398,7 @@
   <div id="upload-zone" onclick="document.getElementById('file-input').click()">
     <div class="upload-icon">📂</div>
     <h2>Cargar resultados del backtest</h2>
-    <p>Arrastra el archivo <code>backtest_results.json</code> aquí<br>o haz clic para seleccionarlo</p>
-    <button class="btn-demo" onclick="event.stopPropagation(); cargarDemo()">
-      ▶  Ver con datos de demostración
-    </button>
+    <p>Arrastra un archivo <code>.json</code> de backtest aquí<br>o haz clic para seleccionarlo</p>
     <input type="file" id="file-input" accept=".json" onchange="cargarArchivo(event)">
   </div>
 
@@ -534,104 +533,6 @@ function leerJSON(file) {
   const r = new FileReader();
   r.onload = ev => inicializar(JSON.parse(ev.target.result));
   r.readAsText(file);
-}
-
-// ═══════════════════════════════════════════
-//  DATOS DE DEMO
-// ═══════════════════════════════════════════
-function cargarDemo() {
-  const demo = generarDemo();
-  inicializar(demo);
-}
-
-function generarDemo() {
-  const rng = (a,b) => Math.random()*(b-a)+a;
-  const capital0 = 1000;
-  let capital = capital0;
-  const trades = [];
-  const equity = [{ t: '2024-10-01T00:00:00', v: capital }];
-  const sesiones = ['london','new_york','asia'];
-  const dirs = ['LONG','SHORT'];
-
-  let fecha = new Date('2024-10-01');
-  for (let i = 0; i < 87; i++) {
-    fecha = new Date(fecha.getTime() + rng(60,480)*60000);
-    const dir  = dirs[Math.floor(Math.random()*2)];
-    const ses  = sesiones[Math.floor(Math.random()*3)];
-    const win  = Math.random() < 0.52;   // 52% win rate
-    const pe   = rng(58000, 72000);
-    const atr  = rng(200, 600);
-    const sl   = dir==='LONG' ? pe - atr*1.5 : pe + atr*1.5;
-    const tp   = dir==='LONG' ? pe + atr*3   : pe - atr*3;
-    const sz   = (capital * 0.01) / (atr*1.5);
-    const pnl  = win ? sz*(atr*3)*0.9996 : -sz*(atr*1.5)*1.0004;
-    capital   += pnl;
-    const fechaOut = new Date(fecha.getTime() + rng(15,240)*60000);
-    trades.push({
-      id: i+1,
-      timestamp_in:   fecha.toISOString(),
-      timestamp_out:  fechaOut.toISOString(),
-      direccion:      dir,
-      precio_entrada: +pe.toFixed(2),
-      precio_salida:  +(win ? tp : sl).toFixed(2),
-      stop_loss:      +sl.toFixed(2),
-      take_profit:    +tp.toFixed(2),
-      tamaño:         +sz.toFixed(6),
-      pnl_usd:        +pnl.toFixed(4),
-      pnl_pct:        +(pnl/capital0*100).toFixed(3),
-      resultado:      win ? 'WIN' : 'LOSS',
-      duracion_min:   Math.round((fechaOut-fecha)/60000),
-      score_señal:    Math.round(rng(50,100)),
-      motivos:        ['FVG alcista detectado','BOS confirmado'],
-      capital_post:   +capital.toFixed(2),
-      sesion:         ses,
-      atr_entrada:    +atr.toFixed(2),
-    });
-    equity.push({ t: fechaOut.toISOString(), v: +capital.toFixed(2) });
-  }
-
-  const wins   = trades.filter(t=>t.resultado==='WIN');
-  const losses = trades.filter(t=>t.resultado==='LOSS');
-  const porSesion = {};
-  trades.forEach(t => {
-    if (!porSesion[t.sesion]) porSesion[t.sesion] = {total:0,wins:0,pnl:0};
-    porSesion[t.sesion].total++;
-    if (t.resultado==='WIN') porSesion[t.sesion].wins++;
-    porSesion[t.sesion].pnl += t.pnl_usd;
-  });
-  const porHora = {};
-  trades.forEach(t => {
-    const h = new Date(t.timestamp_in).getUTCHours().toString();
-    if (!porHora[h]) porHora[h] = {total:0,wins:0,pnl:0};
-    porHora[h].total++;
-    if (t.resultado==='WIN') porHora[h].wins++;
-    porHora[h].pnl += t.pnl_usd;
-  });
-
-  const pnls = trades.map(t=>t.pnl_usd);
-  const mean = pnls.reduce((a,b)=>a+b,0)/pnls.length;
-  const std  = Math.sqrt(pnls.map(p=>(p-mean)**2).reduce((a,b)=>a+b,0)/pnls.length);
-
-  return {
-    symbol:'BTCUSDT', timeframe:'15m',
-    fecha_inicio:'2024-10-01T00:00:00', fecha_fin:'2024-12-31T23:59:00',
-    capital_inicial: capital0, capital_final: +capital.toFixed(2),
-    total_trades: trades.length,
-    wins: wins.length, losses: losses.length,
-    win_rate: +(wins.length/trades.length*100).toFixed(2),
-    profit_factor: +(wins.reduce((a,t)=>a+t.pnl_usd,0)/Math.abs(losses.reduce((a,t)=>a+t.pnl_usd,0))).toFixed(3),
-    max_drawdown_pct: 12.4, max_drawdown_usd: 124,
-    sharpe_ratio: +(mean/std*Math.sqrt(252)).toFixed(3),
-    avg_win_usd:  +(wins.reduce((a,t)=>a+t.pnl_usd,0)/wins.length).toFixed(2),
-    avg_loss_usd: +(losses.reduce((a,t)=>a+t.pnl_usd,0)/losses.length).toFixed(2),
-    avg_duracion_min: +(trades.reduce((a,t)=>a+t.duracion_min,0)/trades.length).toFixed(1),
-    mejor_trade_usd: +Math.max(...pnls).toFixed(2),
-    peor_trade_usd:  +Math.min(...pnls).toFixed(2),
-    racha_wins: 6, racha_losses: 4,
-    trades, equity_curve: equity,
-    trades_por_sesion: porSesion,
-    trades_por_hora: porHora,
-  };
 }
 
 // ═══════════════════════════════════════════
@@ -1019,34 +920,39 @@ function filtrarTrades(filtro, btn) {
 // Detectar si estamos en un servidor real (no file://)
 const EN_SERVIDOR = window.location.protocol !== 'file:';
 
-// Archivos conocidos que puede generar el bot
-// El servidor los expone en la misma carpeta que el HTML
-function getNombresEsperados() {
-  const hoy    = new Date();
-  const fechas = [];
-  // Últimos 7 días
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(hoy);
-    d.setDate(d.getDate() - i);
-    const ymd = d.toISOString().slice(0,10).replace(/-/g,'');
-    fechas.push({ name: `dashboard_trades_${ymd}.json`, type: 'live',    label: `Live ${ymd.slice(0,4)}-${ymd.slice(4,6)}-${ymd.slice(6)}` });
-  }
-  fechas.push({ name: 'backtest_results.json', type: 'bt',   label: 'Backtest' });
-  fechas.push({ name: 'data.json',             type: 'demo', label: 'Demo'     });
-  return fechas;
-}
-
+// Descubrir archivos reales del servidor via nginx autoindex (JSON)
 async function buscarArchivosServidor() {
   if (!EN_SERVIDOR) return [];
   const archivos = [];
-  const candidatos = getNombresEsperados();
 
-  await Promise.all(candidatos.map(async (c) => {
-    try {
-      const r = await fetch(c.name, { method: 'HEAD', cache: 'no-store' });
-      if (r.ok) archivos.push(c);
-    } catch {}
-  }));
+  // Buscar backtests en /backtest/ (autoindex JSON)
+  try {
+    const r = await fetch('/backtest/?t=' + Date.now(), { cache: 'no-store' });
+    if (r.ok) {
+      const items = await r.json();
+      for (const item of items) {
+        if (item.name && item.name.endsWith('.json')) {
+          const label = item.name.replace('.json', '').replace(/_/g, ' ');
+          archivos.push({ name: 'backtest/' + item.name, type: 'bt', label });
+        }
+      }
+    }
+  } catch {}
+
+  // Buscar logs live en /api/logs/ (autoindex JSON)
+  try {
+    const r = await fetch('/api/logs/?t=' + Date.now(), { cache: 'no-store' });
+    if (r.ok) {
+      const items = await r.json();
+      for (const item of items) {
+        if (item.name && item.name.startsWith('dashboard_trades_') && item.name.endsWith('.json')) {
+          const ymd = item.name.replace('dashboard_trades_', '').replace('.json', '');
+          const label = `Live ${ymd.slice(0,4)}-${ymd.slice(4,6)}-${ymd.slice(6)}`;
+          archivos.push({ name: 'api/logs/' + item.name, type: 'live', label });
+        }
+      }
+    }
+  } catch {}
 
   // Ordenar: live primero (más reciente), luego backtest
   archivos.sort((a,b) => {
@@ -1064,17 +970,19 @@ async function renderServerFiles() {
   document.getElementById('divider-or').style.display = 'flex';
 
   const lista  = document.getElementById('server-file-list');
+  lista.innerHTML = '<span class="no-server-files">Buscando archivos...</span>';
+
   const archs  = await buscarArchivosServidor();
 
   if (archs.length === 0) {
-    lista.innerHTML = '<span class="no-server-files">No se encontraron archivos JSON en el servidor.<br>El bot genera los archivos en logs/ cuando opera.</span>';
+    lista.innerHTML = '<span class="no-server-files">No se encontraron archivos JSON en el servidor.<br>Corré un backtest o esperá a que el bot genere trades.</span>';
     return;
   }
 
   lista.innerHTML = archs.map(a => `
     <button class="file-btn" onclick="cargarDesdeServidor('${a.name}', this)" title="${a.name}">
-      <span class="file-type ${a.type === 'live' ? 'type-live' : a.type === 'bt' ? 'type-bt' : 'type-demo'}">
-        ${a.type === 'live' ? 'LIVE' : a.type === 'bt' ? 'BT' : 'DEMO'}
+      <span class="file-type ${a.type === 'live' ? 'type-live' : 'type-bt'}">
+        ${a.type === 'live' ? 'LIVE' : 'BT'}
       </span>
       ${a.label}
     </button>
