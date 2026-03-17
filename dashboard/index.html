@@ -7,7 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
-  :root {
+  :root, [data-theme="dark"] {
     --bg:        #080c10;
     --surface:   #0d1117;
     --surface2:  #131b24;
@@ -18,8 +18,53 @@
     --red:       #ff3d57;
     --yellow:    #ffd600;
     --text:      #c9d1d9;
+    --text-strong: #ffffff;
     --muted:     #4a5568;
     --glow:      0 0 20px rgba(0,212,255,0.15);
+    --header-grad: linear-gradient(180deg, #0a1520 0%, var(--bg) 100%);
+    --tooltip-bg:  #0d1117;
+    --tooltip-border: #1e2d3d;
+    --tooltip-title:  #00d4ff;
+    --tooltip-body:   #c9d1d9;
+    --chart-grid:  rgba(30,45,61,0.7);
+    --chart-accent-fill-0: rgba(0,212,255,0.3);
+    --chart-accent-fill-1: rgba(0,212,255,0.01);
+    --chart-green-bar:  rgba(0,230,118,0.7);
+    --chart-red-bar:    rgba(255,61,87,0.7);
+    --chart-yellow-bar: rgba(255,214,0,0.5);
+    --logo-glow-in: rgba(0,212,255,0.1);
+    --logo-glow-out: rgba(0,212,255,0.3);
+    --scanline: rgba(0,0,0,0.04);
+  }
+
+  [data-theme="light"] {
+    --bg:        #f5f5f7;
+    --surface:   #ffffff;
+    --surface2:  #eef0f4;
+    --border:    #d1d5db;
+    --accent:    #0066cc;
+    --accent2:   #6d28d9;
+    --green:     #16a34a;
+    --red:       #dc2626;
+    --yellow:    #ca8a04;
+    --text:      #1f2937;
+    --text-strong: #000000;
+    --muted:     #6b7280;
+    --glow:      0 0 20px rgba(0,102,204,0.08);
+    --header-grad: linear-gradient(180deg, #e8eaef 0%, var(--bg) 100%);
+    --tooltip-bg:  #ffffff;
+    --tooltip-border: #d1d5db;
+    --tooltip-title:  #0066cc;
+    --tooltip-body:   #1f2937;
+    --chart-grid:  rgba(0,0,0,0.06);
+    --chart-accent-fill-0: rgba(0,102,204,0.2);
+    --chart-accent-fill-1: rgba(0,102,204,0.01);
+    --chart-green-bar:  rgba(22,163,74,0.7);
+    --chart-red-bar:    rgba(220,38,38,0.7);
+    --chart-yellow-bar: rgba(202,138,4,0.5);
+    --logo-glow-in: rgba(0,102,204,0.1);
+    --logo-glow-out: rgba(0,102,204,0.15);
+    --scanline: rgba(0,0,0,0.015);
   }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -38,7 +83,7 @@
     position: fixed; inset: 0;
     background: repeating-linear-gradient(0deg,
       transparent, transparent 2px,
-      rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 4px);
+      var(--scanline) 2px, var(--scanline) 4px);
     pointer-events: none;
     z-index: 9999;
   }
@@ -46,7 +91,7 @@
   /* ─── HEADER ─── */
   header {
     border-bottom: 1px solid var(--border);
-    background: linear-gradient(180deg, #0a1520 0%, var(--bg) 100%);
+    background: var(--header-grad);
     padding: 24px 32px;
     display: flex;
     align-items: center;
@@ -63,12 +108,12 @@
     border-radius: 8px;
     display: grid; place-items: center;
     font-size: 18px;
-    box-shadow: var(--glow), inset 0 0 12px rgba(0,212,255,0.1);
+    box-shadow: var(--glow), inset 0 0 12px var(--logo-glow-in);
     animation: pulse-border 3s ease-in-out infinite;
   }
   @keyframes pulse-border {
-    0%,100% { box-shadow: var(--glow), inset 0 0 12px rgba(0,212,255,0.1); }
-    50%      { box-shadow: 0 0 30px rgba(0,212,255,0.3), inset 0 0 20px rgba(0,212,255,0.2); }
+    0%,100% { box-shadow: var(--glow), inset 0 0 12px var(--logo-glow-in); }
+    50%      { box-shadow: 0 0 30px var(--logo-glow-out), inset 0 0 20px var(--logo-glow-in); }
   }
   .logo-text { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px; }
   .logo-text span { color: var(--accent); }
@@ -150,12 +195,21 @@
     opacity: 0.5;
   }
   .kpi-label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
-  .kpi-value { font-family: 'Syne', sans-serif; font-size: 26px; font-weight: 800; line-height: 1; }
+  .kpi-value { font-family: 'Syne', sans-serif; font-size: 26px; font-weight: 800; line-height: 1; color: var(--text-strong); }
   .kpi-sub   { color: var(--muted); font-size: 10px; margin-top: 4px; }
   .kpi-green { color: var(--green); }
   .kpi-red   { color: var(--red); }
   .kpi-yellow{ color: var(--yellow); }
   .kpi-accent{ color: var(--accent); }
+
+  /* ─── THEME TOGGLE ─── */
+  .theme-toggle {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 10px;
+    cursor: pointer; font-size: 16px; line-height: 1;
+    transition: all 0.2s; display: grid; place-items: center;
+  }
+  .theme-toggle:hover { border-color: var(--accent); }
   @keyframes fadeUp {
     from { opacity:0; transform:translateY(16px); }
     to   { opacity:1; transform:translateY(0); }
@@ -481,6 +535,7 @@
     <div><span class="status-dot"></span>Dashboard v3.0 — Live + Backtest</div>
     <div id="header-period" style="margin-top:2px;"></div>
   </div>
+  <button class="theme-toggle" onclick="toggleTheme()" title="Cambiar tema">🌓</button>
 </header>
 
 <main>
@@ -950,22 +1005,30 @@ function renderKPIs(d, retPct) {
 // ═══════════════════════════════════════════
 //  CHART HELPERS
 // ═══════════════════════════════════════════
-const C = {
-  accent: '#00d4ff', green: '#00e676', red: '#ff3d57',
-  yellow: '#ffd600', purple: '#7c3aed',
-  grid:   'rgba(30,45,61,0.7)',
-  text:   '#4a5568',
-};
+const C = {};
+function refreshChartColors() {
+  const s = getComputedStyle(document.documentElement);
+  C.accent = s.getPropertyValue('--accent').trim();
+  C.green  = s.getPropertyValue('--green').trim();
+  C.red    = s.getPropertyValue('--red').trim();
+  C.yellow = s.getPropertyValue('--yellow').trim();
+  C.purple = s.getPropertyValue('--accent2').trim();
+  C.grid   = s.getPropertyValue('--chart-grid').trim();
+  C.text   = s.getPropertyValue('--muted').trim();
+}
+refreshChartColors();
 
 function baseChartOpts(title='') {
+  const s = getComputedStyle(document.documentElement);
   return {
     responsive: true, maintainAspectRatio: false,
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: '#0d1117',
-        borderColor: '#1e2d3d', borderWidth: 1,
-        titleColor: '#00d4ff', bodyColor: '#c9d1d9',
+        backgroundColor: s.getPropertyValue('--tooltip-bg').trim(),
+        borderColor: s.getPropertyValue('--tooltip-border').trim(), borderWidth: 1,
+        titleColor: s.getPropertyValue('--tooltip-title').trim(),
+        bodyColor: s.getPropertyValue('--tooltip-body').trim(),
         titleFont: { family: 'JetBrains Mono', size: 11 },
         bodyFont:  { family: 'JetBrains Mono', size: 11 },
       }
@@ -993,8 +1056,9 @@ function renderEquityChart(d) {
 
   const ctx = document.getElementById('equityChart').getContext('2d');
   const grad = ctx.createLinearGradient(0, 0, 0, 320);
-  grad.addColorStop(0, 'rgba(0,212,255,0.3)');
-  grad.addColorStop(1, 'rgba(0,212,255,0.01)');
+  const s = getComputedStyle(document.documentElement);
+  grad.addColorStop(0, s.getPropertyValue('--chart-accent-fill-0').trim());
+  grad.addColorStop(1, s.getPropertyValue('--chart-accent-fill-1').trim());
 
   charts.equity = new Chart(ctx, {
     type: 'line',
@@ -1037,7 +1101,8 @@ function renderPnlDist(d) {
     counts[b]++;
   });
   const labels = counts.map((_,i) => `$${(min+i*bw).toFixed(0)}`);
-  const colors = counts.map((_,i) => (min + i*bw) >= 0 ? 'rgba(0,230,118,0.7)' : 'rgba(255,61,87,0.7)');
+  const cs = getComputedStyle(document.documentElement);
+  const colors = counts.map((_,i) => (min + i*bw) >= 0 ? cs.getPropertyValue('--chart-green-bar').trim() : cs.getPropertyValue('--chart-red-bar').trim());
 
   charts.pnlDist = new Chart(document.getElementById('pnlDistChart'), {
     type: 'bar',
@@ -1103,7 +1168,12 @@ function renderHourChart(d) {
       labels,
       datasets: [{
         label:'Win Rate %', data: wrs,
-        backgroundColor: wrs.map(w => w >= 55 ? 'rgba(0,230,118,0.7)' : w >= 45 ? 'rgba(255,214,0,0.5)' : 'rgba(255,61,87,0.5)'),
+        backgroundColor: wrs.map(w => {
+          const s = getComputedStyle(document.documentElement);
+          return w >= 55 ? s.getPropertyValue('--chart-green-bar').trim()
+               : w >= 45 ? s.getPropertyValue('--chart-yellow-bar').trim()
+               : s.getPropertyValue('--chart-red-bar').trim();
+        }),
         borderRadius: 4,
       }]
     },
@@ -1142,13 +1212,14 @@ function renderMonthChart(d) {
   const wins   = labels.map(m => byMonth[m].wins);
   const losses = labels.map(m => byMonth[m].losses);
 
+  const _ms = getComputedStyle(document.documentElement);
   charts.month = new Chart(document.getElementById('monthChart'), {
     type: 'bar',
     data: {
       labels,
       datasets: [
-        { label:'Wins',   data:wins,   backgroundColor:'rgba(0,230,118,0.7)', borderRadius:4 },
-        { label:'Losses', data:losses, backgroundColor:'rgba(255,61,87,0.7)',  borderRadius:4 },
+        { label:'Wins',   data:wins,   backgroundColor: _ms.getPropertyValue('--chart-green-bar').trim(), borderRadius:4 },
+        { label:'Losses', data:losses, backgroundColor: _ms.getPropertyValue('--chart-red-bar').trim(),  borderRadius:4 },
       ]
     },
     options: {
@@ -1578,6 +1649,37 @@ if (EN_SERVIDOR) {
     setInterval(renderServerFiles, 300000);
   });
 }
+
+// ═══════════════════════════════════════════
+//  THEME TOGGLE
+// ═══════════════════════════════════════════
+function toggleTheme() {
+  const html = document.documentElement;
+  const current = html.getAttribute('data-theme') || 'dark';
+  const next = current === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('smc-theme', next);
+  document.querySelector('.theme-toggle').textContent = next === 'dark' ? '🌓' : '☀️';
+  // Re-render charts con nuevos colores
+  refreshChartColors();
+  if (DATA) {
+    renderEquityChart(DATA);
+    renderPnlDist(DATA);
+    renderCumulativePnl(DATA);
+    renderHourChart(DATA);
+    renderMonthChart(DATA);
+  }
+}
+
+// Cargar tema guardado al iniciar
+(function() {
+  const saved = localStorage.getItem('smc-theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', saved);
+  document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.querySelector('.theme-toggle');
+    if (btn) btn.textContent = saved === 'dark' ? '🌓' : '☀️';
+  });
+})();
 
 </script>
 </body>
