@@ -369,7 +369,8 @@ def main():
             parts = ["bt", args.symbol.lower(), args.timeframe, nombre, args.trailing,
                      f"{args.dias}d", f"mt{args.max_trades}"]
             if args.windows:
-                parts.append(f"w{args.windows.replace(',','_')}")
+                win_safe = args.windows.replace(',','_').replace('"','').replace("'","")
+                parts.append(f"w{win_safe}")
             if args.rr:
                 parts.append(f"rr{args.rr}")
             if args.score:

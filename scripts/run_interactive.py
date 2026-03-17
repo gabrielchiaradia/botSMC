@@ -140,9 +140,17 @@ def main():
     use_windows = ask_yn("¿Definir ventanas horarias? (si no, usa .env)")
     windows_list = [None]
     if use_windows:
-        raw = input(f"\n{CYAN}▸ Ventanas UTC (ej: 13-16). Vacío = 24h. Separar con ; para múltiples\n  > {RESET}").strip()
+        raw = input(f"\n{CYAN}▸ Ventanas UTC (ej: 13-16). Vacío o 24h = sin filtro. Separar con ; para múltiples\n  > {RESET}").strip()
         if raw:
-            windows_list = [w.strip() for w in raw.split(";")]
+            windows_list = []
+            for w in raw.split(";"):
+                w = w.strip().strip('"').strip("'")  # quitar comillas
+                if w.lower() in ("24h", "24hs", "todo", "all", ""):
+                    windows_list.append("")
+                else:
+                    windows_list.append(w)
+            if not windows_list:
+                windows_list = [""]
         else:
             windows_list = [""]  # vacío = 24h sin filtro
 
