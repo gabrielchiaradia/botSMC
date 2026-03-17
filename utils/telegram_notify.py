@@ -129,14 +129,21 @@ class TelegramNotifier:
         return self._enviar(texto)
 
     def bot_iniciado(self, symbol: str, ltf: str, htf: str,
-                      modo: str, capital: float) -> bool:
+                      modo: str, capital: float, mtf_enabled: bool = True) -> bool:
         """Notifica que el bot arrancó."""
+        if mtf_enabled:
+            tf_info = (
+                f"LTF:     `{ltf}` (entrada)\n"
+                f"HTF:     `{htf}` (contexto)\n"
+            )
+        else:
+            tf_info = f"TF:      `{ltf}`\n"
+
         texto = (
             f"🚀 *SMC Bot Iniciado*\n"
             f"{'─'*28}\n"
             f"Par:     `{symbol}`\n"
-            f"LTF:     `{ltf}` (entrada)\n"
-            f"HTF:     `{htf}` (contexto)\n"
+            f"{tf_info}"
             f"Modo:    `{'PAPER' if modo == 'PAPER' else '⚡ LIVE'}`\n"
             f"Capital: `${capital:,.2f} USDT`\n"
             f"🕐 `{datetime.now().strftime('%Y-%m-%d %H:%M')} Local`"

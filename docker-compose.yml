@@ -23,6 +23,7 @@ services:
       dockerfile: Dockerfile
     image: smc-bot:latest
     container_name: smc-bot
+    command: ["--live"]
 
     restart: unless-stopped
 
@@ -68,6 +69,7 @@ services:
   # smc-bot-2:
   #   image: smc-bot:latest
   #   container_name: smc-bot-2
+  #   command: ["--live"]
   #   restart: unless-stopped
   #   env_file:
   #     - .env2
@@ -77,6 +79,7 @@ services:
   #     - ./logs:/app/logs
   #     - ./backtest/results:/app/backtest/results
   #     - ./data/cache:/app/data/cache
+  #     - ./.env2:/app/.env2:ro
   #   deploy:
   #     resources:
   #       limits:

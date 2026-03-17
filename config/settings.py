@@ -68,6 +68,7 @@ class RiskConfig:
     ATR_MULTIPLIER:  float = float(os.getenv("ATR_MULTIPLIER", "1.5"))
     MAX_OPEN_TRADES: int   = int(os.getenv("MAX_OPEN_TRADES", "1"))
     MAX_DAILY_LOSS:  float = float(os.getenv("MAX_DAILY_LOSS", "0.03"))   # 3% diario
+    BOT_CAPITAL:     float = float(os.getenv("BOT_CAPITAL", "0"))         # 0 = usar balance real
 
 
 # ══════════════════════════════════════════════════════════

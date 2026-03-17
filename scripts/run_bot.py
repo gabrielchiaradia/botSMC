@@ -311,14 +311,19 @@ def main():
     print(f"{'='*60}")
     print(f"  Bot:        #{BOT_NUMBER} ({BOT_TAG})")
     print(f"  Par:        {excfg.SYMBOL}")
-    print(f"  LTF:        {mcfg.LTF}  (entrada)")
-    print(f"  HTF:        {mcfg.HTF}  (contexto)")
+    if mcfg.ENABLED:
+        print(f"  LTF:        {mcfg.LTF}  (entrada)")
+        print(f"  HTF:        {mcfg.HTF}  (contexto)")
+    else:
+        print(f"  Timeframe:  {excfg.TIMEFRAME}")
     print(f"  Modo:       {modo}")
     print(f"  Stream:     {'WebSocket' if usar_ws else 'Polling REST'}")
     print(f"  MTF:        {'ON' if mcfg.ENABLED else 'OFF'}")
     print(f"  Max trades: {rcfg.MAX_OPEN_TRADES}")
     print(f"  RR:         1:{rcfg.TP_RR_RATIO}")
     print(f"  Riesgo:     {rcfg.RISK_PER_TRADE*100:.1f}% por trade")
+    if rcfg.BOT_CAPITAL > 0:
+        print(f"  Capital:    ${rcfg.BOT_CAPITAL:,.0f} USDT (asignado)")
     print(f"{'='*60}\n")
 
     # ── Conectar exchange ─────────────────────────────────
@@ -335,10 +340,19 @@ def main():
     journal  = TradeJournal(symbol=excfg.SYMBOL, timeframe=mcfg.LTF, modo=modo,
                             max_open=rcfg.MAX_OPEN_TRADES, bot_tag=BOT_TAG)
     notifier = crear_notifier(bot_tag=BOT_TAG)
-    balance_ref = [obtener_balance_usdt(client) if client else 1000.0]
-    logger.info("[%s] Balance inicial: $%.2f USDT", BOT_TAG, balance_ref[0])
 
-    notifier.bot_iniciado(excfg.SYMBOL, mcfg.LTF, mcfg.HTF, modo, balance_ref[0])
+    # Capital: usar BOT_CAPITAL del .env si está seteado, sino balance real
+    balance_real = obtener_balance_usdt(client) if client else 1000.0
+    if rcfg.BOT_CAPITAL > 0:
+        balance_ref = [rcfg.BOT_CAPITAL]
+        logger.info("[%s] Capital asignado: $%.2f USDT (balance real: $%.2f)",
+                    BOT_TAG, rcfg.BOT_CAPITAL, balance_real)
+    else:
+        balance_ref = [balance_real]
+        logger.info("[%s] Balance inicial: $%.2f USDT", BOT_TAG, balance_ref[0])
+
+    notifier.bot_iniciado(excfg.SYMBOL, mcfg.LTF, mcfg.HTF, modo, balance_ref[0],
+                          mtf_enabled=mcfg.ENABLED)
 
     # ── Pre-cargar datos historicos ───────────────────────
     logger.info("Pre-cargando datos historicos...")
