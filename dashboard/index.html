@@ -203,14 +203,14 @@
   .kpi-accent{ color: var(--accent); }
 
   /* ─── THEME TOGGLE ─── */
-  .theme-toggle {
+  .header-btn {
     background: var(--surface2); border: 1px solid var(--border);
     border-radius: 8px; padding: 6px 10px;
     cursor: pointer; font-size: 16px; line-height: 1;
     transition: all 0.2s; display: grid; place-items: center;
+    text-decoration: none; font-size: 14px; color: var(--text);
   }
-  .theme-toggle:hover { border-color: var(--accent); }
-  a.theme-toggle { text-decoration: none; font-size: 14px; }
+  .header-btn:hover { border-color: var(--accent); }
   @keyframes fadeUp {
     from { opacity:0; transform:translateY(16px); }
     to   { opacity:1; transform:translateY(0); }
@@ -541,9 +541,9 @@
     <div id="header-period" style="margin-top:2px;"></div>
   </div>
   <div style="display:flex;gap:8px;align-items:center;">
-    <a class="theme-toggle" href="/api/logs/smc_bot.log" target="_blank" title="Log Bot 1">📋</a>
-    <a class="theme-toggle" href="/api/logs/smc_bot_2.log" target="_blank" title="Log Bot 2">📋₂</a>
-    <button class="theme-toggle" onclick="toggleTheme()" title="Cambiar tema">🌓</button>
+    <a class="header-btn" href="/api/logs/smc_bot.log" target="_blank" title="Log Bot 1">📋</a>
+    <a class="header-btn" href="/api/logs/smc_bot_2.log" target="_blank" title="Log Bot 2">📋₂</a>
+    <button class="header-btn" id="theme-btn" onclick="toggleTheme()" title="Cambiar tema">🌓</button>
   </div>
 </header>
 
@@ -1749,7 +1749,7 @@ function toggleTheme() {
   const next = current === 'dark' ? 'light' : 'dark';
   html.setAttribute('data-theme', next);
   localStorage.setItem('smc-theme', next);
-  document.querySelector('.theme-toggle').textContent = next === 'dark' ? '🌓' : '☀️';
+  document.getElementById('theme-btn').textContent = next === 'dark' ? '🌓' : '☀️';
   // Re-render charts con nuevos colores
   refreshChartColors();
   if (DATA) {
@@ -1766,7 +1766,7 @@ function toggleTheme() {
   const saved = localStorage.getItem('smc-theme') || 'dark';
   document.documentElement.setAttribute('data-theme', saved);
   document.addEventListener('DOMContentLoaded', () => {
-    const btn = document.querySelector('.theme-toggle');
+    const btn = document.getElementById('theme-btn');
     if (btn) btn.textContent = saved === 'dark' ? '🌓' : '☀️';
   });
 })();
