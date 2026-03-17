@@ -343,6 +343,10 @@
   #comparison-table thead th:hover { color: var(--accent); }
   #comparison-table thead th.sort-asc::after  { content: ' ▲'; font-size: 9px; color: var(--accent); }
   #comparison-table thead th.sort-desc::after { content: ' ▼'; font-size: 9px; color: var(--accent); }
+  #trades-thead th.sortable { cursor: pointer; user-select: none; }
+  #trades-thead th.sortable:hover { color: var(--accent); }
+  #trades-thead th.sort-asc::after  { content: ' ▲'; font-size: 9px; color: var(--accent); }
+  #trades-thead th.sort-desc::after { content: ' ▼'; font-size: 9px; color: var(--accent); }
   .comp-best { color: var(--green); font-weight: 700; }
   .comp-worst { color: var(--red); opacity: 0.7; }
   .comp-back-btn {
@@ -689,7 +693,7 @@
       </div>
       <div style="overflow-x:auto">
         <table>
-          <thead>
+          <thead id="trades-thead">
             <tr>
               <th>#</th>
               <th>Entrada</th>
@@ -1262,19 +1266,72 @@ function renderSessions(d) {
 var allTrades = [];
 var _originalTrades = [];
 
+// Estado del sort de trades
+let _tradeSortCol = null;
+let _tradeSortAsc = false;
+let _currentFilteredTrades = null;  // trades filtrados actualmente
+
+const TRADE_COLUMNS = [
+  { key: 'id',             label: '#',          get: t => t.id || 0,                                        numeric: true },
+  { key: 'timestamp_in',   label: 'Entrada',    get: t => t.timestamp_in || '',                              numeric: false },
+  { key: 'timestamp_out',  label: 'Salida',     get: t => t.timestamp_out || '',                             numeric: false },
+  { key: 'direccion',      label: 'Dir',        get: t => String(t.direccion || '').toUpperCase(),           numeric: false },
+  { key: 'precio_entrada', label: 'Precio In',  get: t => Number(t.precio_entrada) || 0,                    numeric: true },
+  { key: 'precio_salida',  label: 'Precio Out', get: t => Number(t.precio_salida) || 0,                     numeric: true },
+  { key: 'stop_loss',      label: 'SL',         get: t => Number(t.stop_loss) || 0,                         numeric: true },
+  { key: 'take_profit',    label: 'TP',         get: t => Number(t.take_profit) || 0,                       numeric: true },
+  { key: 'tamaño',         label: 'Tamaño',     get: t => Number(t.tamaño || t.tamaño_activo) || 0,         numeric: true },
+  { key: 'pnl_usd',        label: 'PnL USD',    get: t => Number(t.pnl_usd) || 0,                          numeric: true },
+  { key: 'pnl_pct',        label: 'PnL %',      get: t => Number(t.pnl_pct) || 0,                          numeric: true },
+  { key: 'duracion_min',   label: 'Dur',        get: t => Number(t.duracion_min) || 0,                      numeric: true },
+  { key: 'sesion',         label: 'Sesión',     get: t => String(t.sesion || '').toUpperCase(),              numeric: false },
+  { key: 'score',          label: 'Score',      get: t => Number(t.score_señal || t.score) || 0,            numeric: true },
+  { key: 'resultado',      label: 'Resultado',  get: t => String(t.resultado || '').toUpperCase(),          numeric: false },
+];
+
+function renderTradesHeader() {
+  var thead = document.getElementById('trades-thead');
+  if (!thead) return;
+  thead.innerHTML = '<tr>' + TRADE_COLUMNS.map(col => {
+    var cls = 'sortable';
+    if (_tradeSortCol === col.key) cls += _tradeSortAsc ? ' sort-asc' : ' sort-desc';
+    return '<th class="' + cls + '" onclick="sortTrades(\'' + col.key + '\')">' + col.label + '</th>';
+  }).join('') + '</tr>';
+}
+
 function renderTradesTable(trades, isOriginal) {
   if (isOriginal) {
     _originalTrades = trades || [];
     allTrades = _originalTrades;
+    _currentFilteredTrades = null;
+    _tradeSortCol = null;  // reset sort al cargar nuevos datos
   }
   var displayTrades = trades || [];
+
+  renderTradesHeader();
+
   var countEl = document.getElementById('trade-count');
   if (countEl) countEl.textContent = displayTrades.length + ' trades';
   var tbody = document.getElementById('trades-tbody');
   if (!tbody) return;
 
+  // Aplicar sort si hay uno activo
+  var sorted = displayTrades.slice();
+  if (_tradeSortCol) {
+    var col = TRADE_COLUMNS.find(function(c) { return c.key === _tradeSortCol; });
+    if (col) {
+      sorted.sort(function(a, b) {
+        var va = col.get(a), vb = col.get(b);
+        var cmp = col.numeric ? va - vb : String(va).localeCompare(String(vb));
+        return _tradeSortAsc ? cmp : -cmp;
+      });
+    }
+  }
+
+  var list = sorted.slice(-200);
+  if (!_tradeSortCol) list = list.reverse();  // default: más reciente primero
+
   var rows = [];
-  var list = displayTrades.slice(-200).reverse();
   for (var i = 0; i < list.length; i++) {
     var t = list[i];
     var pnlUsd = Number(t.pnl_usd) || 0;
@@ -1293,7 +1350,6 @@ function renderTradesTable(trades, isOriginal) {
     var tsIn = String(t.timestamp_in || '').slice(0,16).replace('T',' ');
     var tsOut = String(t.timestamp_out || '').slice(0,16).replace('T',' ');
     var dur = Number(t.duracion_min) || 0;
-    var rMax = (t.r_maximo && Number(t.r_maximo) > 0) ? Number(t.r_maximo).toFixed(1) + 'R' : '—';
     var dirClass = dir === 'LONG' ? 'long' : dir === 'SHORT' ? 'short' : 'sesion';
     var resClass = res === 'WIN' ? 'win' : res === 'LOSS' ? 'loss' : 'sesion';
     var tpStr = tp > 0 ? '$' + tp.toFixed(2) : 'trailing';
@@ -1319,11 +1375,26 @@ function renderTradesTable(trades, isOriginal) {
   tbody.innerHTML = rows.join('');
 }
 
+function sortTrades(colKey) {
+  if (_tradeSortCol === colKey) {
+    _tradeSortAsc = !_tradeSortAsc;
+  } else {
+    _tradeSortCol = colKey;
+    var col = TRADE_COLUMNS.find(function(c) { return c.key === colKey; });
+    _tradeSortAsc = col && !col.numeric;
+  }
+  // Re-render con los trades filtrados actuales o todos
+  renderTradesTable(_currentFilteredTrades || _originalTrades);
+}
+
 function filtrarTrades(filtro, btn) {
   var tabs = document.querySelectorAll('.filter-tab');
   for (var i = 0; i < tabs.length; i++) { tabs[i].classList.remove('active'); }
   btn.classList.add('active');
-  if (filtro === 'all') return renderTradesTable(_originalTrades);
+  if (filtro === 'all') {
+    _currentFilteredTrades = null;
+    return renderTradesTable(_originalTrades);
+  }
   var filtered = [];
   for (var j = 0; j < _originalTrades.length; j++) {
     var t = _originalTrades[j];
@@ -1333,6 +1404,7 @@ function filtrarTrades(filtro, btn) {
       if (String(t.direccion||'').toUpperCase() === filtro) filtered.push(t);
     }
   }
+  _currentFilteredTrades = filtered;
   return renderTradesTable(filtered);
 }
 
