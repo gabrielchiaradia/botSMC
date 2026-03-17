@@ -428,7 +428,25 @@
     padding: 2px 6px; border-radius: 3px; }
   .pos-card .pos-detail { font-size: 11px; color: var(--muted); line-height: 1.8; }
   .pos-card .pos-detail span { color: var(--text); }
+  .pos-card .pos-pnl {
+    margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .pos-card .pos-pnl-value { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800; }
+  .pos-card .pos-pnl-value.pnl-up   { color: var(--green); }
+  .pos-card .pos-pnl-value.pnl-down { color: var(--red); }
+  .pos-card .pos-price-now { font-size: 10px; color: var(--muted); }
+  .pos-card .pos-pnl-pct { font-size: 11px; }
   .pos-empty { color: var(--muted); font-size: 11px; font-style: italic; padding: 8px 0; }
+  .price-ticker {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 10px; color: var(--muted); margin-left: 12px;
+  }
+  .price-ticker .price-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--muted);
+    transition: background 0.3s;
+  }
+  .price-ticker .price-dot.live { background: var(--green); box-shadow: 0 0 6px rgba(0,230,118,0.5); }
 
   .auto-refresh-badge {
     display: inline-flex; align-items: center; gap: 5px;
@@ -471,6 +489,10 @@
   <!-- OPEN POSITIONS (solo visible cuando se accede desde el VPS) -->
   <div class="open-positions" id="open-positions-section" style="display:none">
     <h2>⚡ Posiciones Abiertas
+      <span class="price-ticker" id="price-ticker">
+        <span class="price-dot" id="price-dot"></span>
+        <span id="price-label">Conectando...</span>
+      </span>
       <button class="btn-reload" onclick="renderOpenPositions()" title="Recargar">⟳</button>
     </h2>
     <div class="pos-grid" id="open-positions-grid">
@@ -1391,16 +1413,16 @@ setInterval(async () => {
 
 // Arrancar al cargar la página
 // ═══════════════════════════════════════════
-//  OPEN POSITIONS
+//  OPEN POSITIONS + REAL-TIME PnL
 // ═══════════════════════════════════════════
-async function renderOpenPositions() {
-  if (!EN_SERVIDOR) return;
-  document.getElementById('open-positions-section').style.display = 'block';
+let _openPositions = [];
+let _livePrices = {};     // { 'ETHUSDT': 1920.50, ... }
+let _priceWs = null;
+let _subscribedSymbols = new Set();
 
-  const grid = document.getElementById('open-positions-grid');
+async function fetchOpenPositions() {
+  if (!EN_SERVIDOR) return [];
   const allPositions = [];
-
-  // Buscar open_positions.json y open_positions_N.json
   try {
     const r = await fetch('/api/logs/?t=' + Date.now(), { cache: 'no-store' });
     if (r.ok) {
@@ -1424,13 +1446,99 @@ async function renderOpenPositions() {
       }
     }
   } catch {}
+  return allPositions;
+}
 
-  if (allPositions.length === 0) {
-    grid.innerHTML = '<span class="pos-empty">Sin posiciones abiertas</span>';
+function connectPriceWebSocket(symbols) {
+  // Cerrar conexión anterior si cambió el set de symbols
+  const symKey = [...symbols].sort().join(',');
+  const oldKey = [..._subscribedSymbols].sort().join(',');
+  if (_priceWs && symKey === oldKey && _priceWs.readyState === WebSocket.OPEN) return;
+
+  if (_priceWs) { _priceWs.close(); _priceWs = null; }
+  if (symbols.size === 0) {
+    document.getElementById('price-dot').classList.remove('live');
+    document.getElementById('price-label').textContent = 'Sin posiciones';
     return;
   }
 
-  grid.innerHTML = allPositions.map(p => {
+  _subscribedSymbols = new Set(symbols);
+  const streams = [...symbols].map(s => `${s.toLowerCase()}@ticker`).join('/');
+  const url = `wss://stream.binance.com:9443/ws/${streams}`;
+
+  try {
+    _priceWs = new WebSocket(url);
+    _priceWs.onopen = () => {
+      document.getElementById('price-dot').classList.add('live');
+      document.getElementById('price-label').textContent = 'Precio en vivo';
+    };
+    _priceWs.onmessage = (evt) => {
+      try {
+        const d = JSON.parse(evt.data);
+        if (d.s && d.c) {
+          _livePrices[d.s] = parseFloat(d.c);
+          updatePnLDisplay();
+        }
+      } catch {}
+    };
+    _priceWs.onclose = () => {
+      document.getElementById('price-dot').classList.remove('live');
+      document.getElementById('price-label').textContent = 'Reconectando...';
+      // Reconectar en 5s
+      setTimeout(() => { if (_openPositions.length > 0) connectPriceWebSocket(_subscribedSymbols); }, 5000);
+    };
+    _priceWs.onerror = () => { _priceWs.close(); };
+  } catch {
+    document.getElementById('price-label').textContent = 'WS no disponible';
+  }
+}
+
+function updatePnLDisplay() {
+  _openPositions.forEach((p, i) => {
+    const price = _livePrices[p.symbol];
+    if (!price) return;
+
+    const el = document.getElementById(`pos-pnl-${i}`);
+    const priceEl = document.getElementById(`pos-price-${i}`);
+    if (!el) return;
+
+    const isLong = p.direccion === 'LONG';
+    const pnl = isLong
+      ? (price - p.precio_entrada) * p.tamaño
+      : (p.precio_entrada - price) * p.tamaño;
+    const pnlPct = p.capital_in > 0 ? (pnl / p.capital_in * 100) : 0;
+    const isUp = pnl >= 0;
+
+    el.innerHTML = `
+      <span class="pos-pnl-value ${isUp ? 'pnl-up' : 'pnl-down'}">
+        ${isUp ? '+' : ''}$${pnl.toFixed(2)}
+      </span>
+      <span class="pos-pnl-pct ${isUp ? 'pnl-up' : 'pnl-down'}">
+        ${isUp ? '+' : ''}${pnlPct.toFixed(2)}%
+      </span>
+    `;
+    if (priceEl) priceEl.textContent = `$${price.toLocaleString('en', {minimumFractionDigits: 2})}`;
+  });
+}
+
+async function renderOpenPositions() {
+  if (!EN_SERVIDOR) return;
+  document.getElementById('open-positions-section').style.display = 'block';
+
+  const grid = document.getElementById('open-positions-grid');
+  _openPositions = await fetchOpenPositions();
+
+  if (_openPositions.length === 0) {
+    grid.innerHTML = '<span class="pos-empty">Sin posiciones abiertas</span>';
+    connectPriceWebSocket(new Set());
+    return;
+  }
+
+  // Obtener symbols únicos para el WebSocket
+  const symbols = new Set(_openPositions.map(p => p.symbol));
+  connectPriceWebSocket(symbols);
+
+  grid.innerHTML = _openPositions.map((p, i) => {
     const isLong = p.direccion === 'LONG';
     const dirClass = isLong ? 'long' : 'short';
     const emoji = isLong ? '🟢' : '🔴';
@@ -1443,14 +1551,21 @@ async function renderOpenPositions() {
       </div>
       <div class="pos-detail">
         ${p.symbol} · ${p._timeframe}<br>
-        Entrada: <span>$${p.precio_entrada?.toLocaleString('en', {minimumFractionDigits: 2})}</span><br>
+        Entrada: <span>$${p.precio_entrada?.toLocaleString('en', {minimumFractionDigits: 2})}</span>
+        → <span class="pos-price-now" id="pos-price-${i}">...</span><br>
         SL: <span>$${p.stop_loss?.toLocaleString('en', {minimumFractionDigits: 2})}</span> · 
         TP: <span>$${p.take_profit?.toLocaleString('en', {minimumFractionDigits: 2})}</span><br>
         Score: <span>${p.score_señal}</span> · ${p._modo}<br>
         <span style="font-size:9px;color:var(--muted)">${ts}</span>
       </div>
+      <div class="pos-pnl" id="pos-pnl-${i}">
+        <span class="pos-pnl-value" style="color:var(--muted)">—</span>
+      </div>
     </div>`;
   }).join('');
+
+  // Si ya tenemos precios, actualizar inmediatamente
+  if (Object.keys(_livePrices).length > 0) updatePnLDisplay();
 }
 
 if (EN_SERVIDOR) {
