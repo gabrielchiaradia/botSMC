@@ -75,7 +75,7 @@ footer { border-top: 3px double var(--rule); padding: 24px 0; margin-top: 60px; 
 
 <!-- PORTADA -->
 <div class="cover">
-  <div class="cover-tag">Guía de operaciones · v1.0</div>
+  <div class="cover-tag">Guía de operaciones · v2.0 — Multi-Bot</div>
   <h1>SMC Futures Bot<br><em>Manual de Operaciones</em></h1>
   <div class="cover-sub">Cómo conectarse, iniciar, parar, monitorizar y mantener el bot en el VPS</div>
   <div class="cover-meta">
@@ -141,25 +141,37 @@ footer { border-top: 3px double var(--rule); padding: 24px 0; margin-top: 60px; 
     <span class="section-title">Bot: iniciar, parar y reiniciar</span>
   </div>
 
-  <p>El bot corre dentro de un container Docker. Todos los comandos se ejecutan desde <code>~/smc-bot</code> como <code>botuser</code>.</p>
+  <p>El sistema soporta múltiples bots en paralelo. <code>smc-bot</code> lee <code>.env</code> y <code>smc-bot-2</code> lee <code>.env2</code>. Todos los comandos se ejecutan desde <code>~/smc-bot</code> como <code>botuser</code>.</p>
 
-  <h3>Iniciar el bot</h3>
+  <h3>Iniciar ambos bots</h3>
   <div class="code-block">
     <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">docker compose</span> up -d --build smc-bot watchtower</pre>
+    <pre><span class="cmd">docker compose</span> up -d smc-bot smc-bot-2 watchtower</pre>
   </div>
-  <p>El flag <code>-d</code> lo ejecuta en background. El bot sigue corriendo aunque cierres la sesión SSH.</p>
 
-  <h3>Parar el bot</h3>
+  <h3>Iniciar solo Bot 1</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">docker compose</span> up -d smc-bot watchtower</pre>
+  </div>
+
+  <h3>Parar solo Bot 2 (sin afectar Bot 1)</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">docker compose</span> stop smc-bot-2</pre>
+  </div>
+
+  <h3>Parar todo</h3>
   <div class="code-block">
     <button class="copy-btn" onclick="copiar(this)">copiar</button>
     <pre><span class="cmd">docker compose</span> down</pre>
   </div>
 
-  <h3>Reiniciar el bot (sin reconstruir)</h3>
+  <h3>Reiniciar un bot específico (sin reconstruir)</h3>
   <div class="code-block">
     <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">docker compose</span> restart smc-bot</pre>
+    <pre><span class="cmd">docker compose</span> restart smc-bot      <span class="comment"># Bot 1</span>
+<span class="cmd">docker compose</span> restart smc-bot-2    <span class="comment"># Bot 2</span></pre>
   </div>
 
   <h3>Reconstruir y reiniciar (después de cambios de código)</h3>
@@ -167,18 +179,24 @@ footer { border-top: 3px double var(--rule); padding: 24px 0; margin-top: 60px; 
     <button class="copy-btn" onclick="copiar(this)">copiar</button>
     <pre><span class="cmd">docker compose</span> down
 <span class="cmd">docker compose</span> build --no-cache smc-bot
-<span class="cmd">docker compose</span> up -d smc-bot watchtower</pre>
+<span class="cmd">docker compose</span> up -d smc-bot smc-bot-2 watchtower
+<span class="cmd">docker builder</span> prune -af</pre>
   </div>
 
-  <h3>Ver si el bot está corriendo</h3>
+  <h3>Ver si los bots están corriendo</h3>
   <div class="code-block">
     <button class="copy-btn" onclick="copiar(this)">copiar</button>
     <pre><span class="cmd">docker compose</span> ps</pre>
   </div>
 
   <div class="alert alert-info">
+    <strong>Multi-Bot</strong>
+    Cada bot lee su propio <code>.env</code> / <code>.env2</code>. Comparten el mismo código, imagen Docker, y conexión Binance. Cada uno tiene su propio journal, logs y tag en Telegram.
+  </div>
+
+  <div class="alert alert-info">
     <strong>Inicio automático</strong>
-    El bot tiene <code>restart: unless-stopped</code> en docker-compose.yml. Si el VPS reinicia, el bot se levanta solo.
+    Ambos bots tienen <code>restart: unless-stopped</code>. Si el VPS reinicia, se levantan solos.
   </div>
 </div>
 
@@ -193,19 +211,23 @@ footer { border-top: 3px double var(--rule); padding: 24px 0; margin-top: 60px; 
   <h3>Logs en tiempo real (Ctrl+C para salir)</h3>
   <div class="code-block">
     <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">docker compose</span> logs -f smc-bot</pre>
+    <pre><span class="cmd">docker compose</span> logs -f smc-bot      <span class="comment"># Bot 1</span>
+<span class="cmd">docker compose</span> logs -f smc-bot-2    <span class="comment"># Bot 2</span>
+<span class="cmd">docker compose</span> logs -f              <span class="comment"># Ambos bots</span></pre>
   </div>
 
   <h3>Últimas N líneas</h3>
   <div class="code-block">
     <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">docker compose</span> logs --tail 50 smc-bot</pre>
+    <pre><span class="cmd">docker compose</span> logs --tail 50 smc-bot
+<span class="cmd">docker compose</span> logs --tail 50 smc-bot-2</pre>
   </div>
 
   <h3>Log del archivo (persiste entre reinicios)</h3>
   <div class="code-block">
     <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">tail</span> -50 ~/smc-bot/logs/smc_bot.log</pre>
+    <pre><span class="cmd">tail</span> -50 ~/smc-bot/logs/smc_bot.log      <span class="comment"># Bot 1</span>
+<span class="cmd">tail</span> -50 ~/smc-bot/logs/smc_bot_2.log    <span class="comment"># Bot 2</span></pre>
   </div>
 
   <h3>Seguir el archivo en vivo</h3>
@@ -299,12 +321,18 @@ footer { border-top: 3px double var(--rule); padding: 24px 0; margin-top: 60px; 
     <button class="copy-btn" onclick="copiar(this)">copiar</button>
     <pre><span class="cmd">docker compose</span> down
 <span class="cmd">docker compose</span> build --no-cache smc-bot
-<span class="cmd">docker compose</span> up -d smc-bot watchtower</pre>
+<span class="cmd">docker compose</span> up -d smc-bot smc-bot-2 watchtower
+<span class="cmd">docker builder</span> prune -af</pre>
   </div>
 
   <div class="alert alert-warn">
     <strong>Importante</strong>
-    El <code>.env</code> no se sube a Git (está en .gitignore). Si cambiás el .env en tu PC, tenés que editarlo manualmente en el VPS también.
+    Los archivos <code>.env</code> y <code>.env2</code> no se suben a Git (están en .gitignore). Si los cambiás en tu PC, tenés que editarlos manualmente en el VPS también.
+  </div>
+
+  <div class="alert alert-info">
+    <strong>Limpieza Docker</strong>
+    El <code>docker builder prune -af</code> limpia el build cache después de cada reconstrucción. Sin esto, el disco se llena rápido.
   </div>
 </div>
 
@@ -313,36 +341,81 @@ footer { border-top: 3px double var(--rule); padding: 24px 0; margin-top: 60px; 
 <div class="section" id="s6">
   <div class="section-header">
     <span class="section-num">06</span>
-    <span class="section-title">Editar configuración (.env)</span>
+    <span class="section-title">Editar configuración (.env / .env2)</span>
   </div>
+
+  <p>Cada bot lee su propio archivo de configuración. <code>.env</code> para Bot 1, <code>.env2</code> para Bot 2, etc.</p>
 
   <div class="code-block">
     <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">nano</span> ~/smc-bot/.env</pre>
+    <pre><span class="cmd">nano</span> ~/smc-bot/.env       <span class="comment"># Bot 1</span>
+<span class="cmd">nano</span> ~/smc-bot/.env2      <span class="comment"># Bot 2</span></pre>
   </div>
 
   <p>Editá los valores que necesites. Guardá con <code>Ctrl+O</code>, Enter, <code>Ctrl+X</code>.</p>
 
-  <h3>Configuración actual recomendada</h3>
+  <div class="alert alert-warn">
+    <strong>Importante: sin comentarios inline</strong>
+    Docker no soporta comentarios en la misma línea que un valor. Escribí los comentarios en líneas separadas.<br>
+    <code>✗ RISK_PER_TRADE=0.01  # 1%</code><br>
+    <code>✓ RISK_PER_TRADE=0.01</code>
+  </div>
+
+  <h3>Variables comunes a ambos bots</h3>
+  <table>
+    <tr><th>Variable</th><th>Descripción</th></tr>
+    <tr><td><code>BINANCE_API_KEY</code></td><td>API key de Binance (testnet o real)</td></tr>
+    <tr><td><code>BINANCE_API_SECRET</code></td><td>API secret de Binance</td></tr>
+    <tr><td><code>TESTNET</code></td><td><code>true</code> = testnet, <code>false</code> = dinero real</td></tr>
+    <tr><td><code>TELEGRAM_TOKEN</code></td><td>Token del bot de Telegram</td></tr>
+    <tr><td><code>TELEGRAM_CHAT_ID</code></td><td>Chat ID para notificaciones</td></tr>
+  </table>
+
+  <h3>Variables Multi-Bot</h3>
+  <table>
+    <tr><th>Variable</th><th>Descripción</th><th>Ejemplo</th></tr>
+    <tr><td><code>BOT_TAG</code></td><td>Nombre que aparece en Telegram y logs</td><td><code>15m-conservador</code></td></tr>
+    <tr><td><code>BOT_CAPITAL</code></td><td>Capital asignado al bot (0 = balance real)</td><td><code>500</code></td></tr>
+  </table>
+
+  <h3>Bot 1 — Conservador (ejemplo)</h3>
   <table>
     <tr><th>Variable</th><th>Valor</th><th>Descripción</th></tr>
     <tr><td><code>SYMBOL</code></td><td><code>ETHUSDT</code></td><td>Par de trading</td></tr>
-    <tr><td><code>TIMEFRAME</code></td><td><code>1h</code></td><td>Velas de 1 hora</td></tr>
-    <tr><td><code>MTF_LTF</code></td><td><code>1h</code></td><td>Timeframe de entrada</td></tr>
-    <tr><td><code>MTF_HTF</code></td><td><code>4h</code></td><td>Timeframe de contexto</td></tr>
-    <tr><td><code>SCORE_MINIMO</code></td><td><code>50</code></td><td>Score mínimo para operar</td></tr>
-    <tr><td><code>ATR_MULTIPLIER</code></td><td><code>1.5</code></td><td>Distancia del SL</td></tr>
-    <tr><td><code>TP_RR_RATIO</code></td><td><code>2.0</code></td><td>Ratio riesgo:recompensa</td></tr>
-    <tr><td><code>MAX_OPEN_TRADES</code></td><td><code>2</code></td><td>Trades simultáneos</td></tr>
+    <tr><td><code>MTF_ENABLED</code></td><td><code>true</code></td><td>Multi-timeframe activado</td></tr>
+    <tr><td><code>MTF_LTF</code></td><td><code>15m</code></td><td>Timeframe de entrada</td></tr>
+    <tr><td><code>MTF_HTF</code></td><td><code>1h</code></td><td>Timeframe de contexto</td></tr>
+    <tr><td><code>TRADING_WINDOWS</code></td><td><code>13-16</code></td><td>Solo opera 13-16 UTC</td></tr>
+    <tr><td><code>TP_RR_RATIO</code></td><td><code>1.5</code></td><td>Ratio riesgo:recompensa</td></tr>
+    <tr><td><code>MAX_OPEN_TRADES</code></td><td><code>3</code></td><td>Trades simultáneos</td></tr>
     <tr><td><code>RISK_PER_TRADE</code></td><td><code>0.01</code></td><td>1% del capital por trade</td></tr>
-    <tr><td><code>TESTNET</code></td><td><code>true</code></td><td>Dinero ficticio</td></tr>
+    <tr><td><code>BOT_CAPITAL</code></td><td><code>1000</code></td><td>Opera sobre $1000</td></tr>
   </table>
 
-  <p>Después de editar, reiniciá el bot:</p>
+  <h3>Bot 2 — Agresivo (ejemplo .env2)</h3>
+  <table>
+    <tr><th>Variable</th><th>Valor</th><th>Descripción</th></tr>
+    <tr><td><code>SYMBOL</code></td><td><code>ETHUSDT</code></td><td>Par de trading</td></tr>
+    <tr><td><code>MTF_ENABLED</code></td><td><code>false</code></td><td>Sin multi-timeframe</td></tr>
+    <tr><td><code>TIMEFRAME</code></td><td><code>1h</code></td><td>Timeframe único</td></tr>
+    <tr><td><code>TRADING_WINDOWS</code></td><td><em>(vacío)</em></td><td>Opera 24hs</td></tr>
+    <tr><td><code>FILTRO_SESION</code></td><td><code>false</code></td><td>Sin filtro de sesión</td></tr>
+    <tr><td><code>TP_RR_RATIO</code></td><td><code>2.5</code></td><td>Ratio riesgo:recompensa</td></tr>
+    <tr><td><code>MAX_OPEN_TRADES</code></td><td><code>3</code></td><td>Trades simultáneos</td></tr>
+    <tr><td><code>RISK_PER_TRADE</code></td><td><code>0.01</code></td><td>1% del capital por trade</td></tr>
+    <tr><td><code>BOT_CAPITAL</code></td><td><code>500</code></td><td>Opera sobre $500</td></tr>
+  </table>
+
+  <p>Después de editar, reiniciá el bot correspondiente:</p>
   <div class="code-block">
     <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">docker compose</span> down
-<span class="cmd">docker compose</span> up -d smc-bot watchtower</pre>
+    <pre><span class="cmd">docker compose</span> restart smc-bot      <span class="comment"># si editaste .env</span>
+<span class="cmd">docker compose</span> restart smc-bot-2    <span class="comment"># si editaste .env2</span></pre>
+  </div>
+
+  <div class="alert alert-warn">
+    <strong>TESTNET=false = dinero real</strong>
+    Verificá siempre que <code>TESTNET=true</code> en ambos archivos antes de deployar. Cambiarlo a <code>false</code> conecta a Binance real con dinero real.
   </div>
 </div>
 
@@ -480,14 +553,20 @@ footer { border-top: 3px double var(--rule); padding: 24px 0; margin-top: 60px; 
   <h3>Docker — Bot</h3>
   <table>
     <tr><th>Acción</th><th>Comando</th></tr>
-    <tr><td>Iniciar bot</td><td><code>docker compose up -d smc-bot watchtower</code></td></tr>
+    <tr><td>Iniciar ambos bots</td><td><code>docker compose up -d smc-bot smc-bot-2 watchtower</code></td></tr>
+    <tr><td>Iniciar solo Bot 1</td><td><code>docker compose up -d smc-bot watchtower</code></td></tr>
     <tr><td>Parar todo</td><td><code>docker compose down</code></td></tr>
-    <tr><td>Reiniciar bot</td><td><code>docker compose restart smc-bot</code></td></tr>
+    <tr><td>Parar solo Bot 2</td><td><code>docker compose stop smc-bot-2</code></td></tr>
+    <tr><td>Reiniciar Bot 1</td><td><code>docker compose restart smc-bot</code></td></tr>
+    <tr><td>Reiniciar Bot 2</td><td><code>docker compose restart smc-bot-2</code></td></tr>
     <tr><td>Reconstruir</td><td><code>docker compose build --no-cache smc-bot</code></td></tr>
+    <tr><td>Limpiar build cache</td><td><code>docker builder prune -af</code></td></tr>
     <tr><td>Ver estado</td><td><code>docker compose ps</code></td></tr>
-    <tr><td>Logs en vivo</td><td><code>docker compose logs -f smc-bot</code></td></tr>
+    <tr><td>Logs Bot 1</td><td><code>docker compose logs -f smc-bot</code></td></tr>
+    <tr><td>Logs Bot 2</td><td><code>docker compose logs -f smc-bot-2</code></td></tr>
+    <tr><td>Logs ambos</td><td><code>docker compose logs -f</code></td></tr>
     <tr><td>Últimas 50 líneas</td><td><code>docker compose logs --tail 50 smc-bot</code></td></tr>
-    <tr><td>Uso de recursos</td><td><code>docker stats smc-bot</code></td></tr>
+    <tr><td>Uso de recursos</td><td><code>docker stats smc-bot smc-bot-2</code></td></tr>
   </table>
 
   <h3>Docker — Dashboard</h3>
@@ -503,7 +582,7 @@ footer { border-top: 3px double var(--rule); padding: 24px 0; margin-top: 60px; 
     <tr><th>Acción</th><th>Comando</th></tr>
     <tr><td>Subir desde Windows</td><td><code>git add . && git commit -m "msg" && git push</code></td></tr>
     <tr><td>Bajar en VPS</td><td><code>git pull</code></td></tr>
-    <tr><td>Aplicar cambios</td><td><code>docker compose down && docker compose build --no-cache smc-bot && docker compose up -d</code></td></tr>
+    <tr><td>Aplicar cambios</td><td><code>docker compose down && docker compose build --no-cache smc-bot && docker compose up -d smc-bot smc-bot-2 watchtower && docker builder prune -af</code></td></tr>
   </table>
 
   <h3>Backtests</h3>
@@ -518,16 +597,21 @@ footer { border-top: 3px double var(--rule); padding: 24px 0; margin-top: 60px; 
   <h3>Configuración</h3>
   <table>
     <tr><th>Acción</th><th>Comando</th></tr>
-    <tr><td>Editar .env</td><td><code>nano ~/smc-bot/.env</code></td></tr>
+    <tr><td>Editar .env (Bot 1)</td><td><code>nano ~/smc-bot/.env</code></td></tr>
+    <tr><td>Editar .env2 (Bot 2)</td><td><code>nano ~/smc-bot/.env2</code></td></tr>
     <tr><td>Ver .env actual</td><td><code>cat ~/smc-bot/.env</code></td></tr>
-    <tr><td>Ver archivos de log</td><td><code>ls -la ~/smc-bot/logs/</code></td></tr>
+    <tr><td>Ver .env2 actual</td><td><code>cat ~/smc-bot/.env2</code></td></tr>
+    <tr><td>Ver logs Bot 1</td><td><code>ls -la ~/smc-bot/logs/smc_bot.log</code></td></tr>
+    <tr><td>Ver logs Bot 2</td><td><code>ls -la ~/smc-bot/logs/smc_bot_2.log</code></td></tr>
     <tr><td>Ver resultados backtest</td><td><code>ls -la ~/smc-bot/backtest/results/</code></td></tr>
+    <tr><td>Espacio en disco</td><td><code>df -h /</code></td></tr>
+    <tr><td>Docker disk usage</td><td><code>docker system df</code></td></tr>
   </table>
 </div>
 
 
 <footer>
-  <span>SMC Futures Bot · Manual de Operaciones v1.0</span>
+  <span>SMC Futures Bot · Manual de Operaciones v2.0 — Multi-Bot</span>
   <span>VPS Vultr · Docker · GitHub</span>
 </footer>
 
