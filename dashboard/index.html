@@ -174,6 +174,46 @@
     background: linear-gradient(90deg, var(--border), transparent);
   }
 
+  /* ─── CONFIG BANNER ─── */
+  .config-banner {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px 24px;
+  }
+  .config-item {
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .config-label {
+    font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--muted);
+  }
+  .config-value {
+    font-size: 13px; font-weight: 600; color: var(--text);
+  }
+  .config-value .accent { color: var(--accent); }
+
+  /* ─── UPLOAD LOCAL BUTTON ─── */
+  .upload-local-bar {
+    display: flex; justify-content: flex-end; margin-bottom: 16px;
+  }
+  .btn-upload-local {
+    padding: 6px 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; cursor: pointer; font-weight: 400;
+    transition: all 0.2s;
+  }
+  .btn-upload-local:hover { border-color: var(--accent); color: var(--accent); }
+
   /* ─── CHART GRID ─── */
   .chart-grid {
     display: grid;
@@ -378,16 +418,27 @@
 <main>
 
 
-  <!-- SERVER FILES (solo visible cuando se accede desde el VPS) -->
-  <div class="server-files" id="server-files-section" style="display:none">
-    <h2>📡 Archivos del servidor
+  <!-- LIVE FILES (solo visible cuando se accede desde el VPS) -->
+  <div class="server-files" id="live-files-section" style="display:none">
+    <h2>📡 Live Trading
       <span class="auto-refresh-badge" id="refresh-badge">
         <span class="status-dot"></span>Auto-refresh 60s
       </span>
-      <button class="btn-reload" onclick="renderServerFiles()" title="Recargar lista de archivos">⟳ Recargar</button>
+      <button class="btn-reload" onclick="renderLiveFiles()" title="Recargar">⟳ Recargar</button>
     </h2>
-    <p>Resultados disponibles en el VPS — click para cargar</p>
-    <div class="file-list" id="server-file-list">
+    <p>Reportes diarios del bot en vivo</p>
+    <div class="file-list" id="live-file-list">
+      <span class="no-server-files">Buscando archivos...</span>
+    </div>
+  </div>
+
+  <!-- BACKTEST FILES (solo visible cuando se accede desde el VPS) -->
+  <div class="server-files" id="backtest-files-section" style="display:none">
+    <h2>📊 Backtests
+      <button class="btn-reload" onclick="renderBacktestFiles()" title="Recargar">⟳ Recargar</button>
+    </h2>
+    <p>Resultados de backtests guardados en el servidor</p>
+    <div class="file-list" id="backtest-file-list">
       <span class="no-server-files">Buscando archivos...</span>
     </div>
   </div>
@@ -404,6 +455,18 @@
 
   <!-- DASHBOARD -->
   <div id="dashboard">
+
+    <!-- UPLOAD LOCAL BUTTON (visible when dashboard is active) -->
+    <div class="upload-local-bar">
+      <button class="btn-upload-local" onclick="document.getElementById('file-input-local').click()">
+        📂 Cargar archivo local
+      </button>
+      <input type="file" id="file-input-local" accept=".json" style="display:none"
+             onchange="cargarArchivoLocal(event)">
+    </div>
+
+    <!-- CONFIG BANNER -->
+    <div class="config-banner" id="config-banner" style="display:none"></div>
 
     <!-- KPIs -->
     <div class="section-title">📈 Resumen de Performance</div>
@@ -529,10 +592,46 @@ function cargarArchivo(e) {
   const file = e.target.files[0];
   if (file) leerJSON(file);
 }
+function cargarArchivoLocal(e) {
+  const file = e.target.files[0];
+  if (file) leerJSON(file);
+  e.target.value = '';  // permitir recargar el mismo archivo
+}
 function leerJSON(file) {
   const r = new FileReader();
   r.onload = ev => inicializar(JSON.parse(ev.target.result));
   r.readAsText(file);
+}
+
+// ═══════════════════════════════════════════
+//  CONFIG BANNER
+// ═══════════════════════════════════════════
+function renderConfigBanner(data) {
+  const banner = document.getElementById('config-banner');
+  const items = [];
+
+  const add = (label, value) => {
+    if (value !== undefined && value !== null && value !== '' && value !== 0) {
+      items.push(`<div class="config-item"><span class="config-label">${label}</span><span class="config-value">${value}</span></div>`);
+    }
+  };
+
+  add('Symbol', data.symbol);
+  add('Timeframe', data.timeframe);
+  add('Período', `${data.fecha_inicio?.slice(0,10)} → ${data.fecha_fin?.slice(0,10)}`);
+  add('Días', data.dias || '—');
+  add('Capital', `$${(data.capital_inicial || 0).toLocaleString('en-US', {minimumFractionDigits:0})}`);
+  add('RR Ratio', data.tp_rr_ratio ? `1:${data.tp_rr_ratio}` : '—');
+  add('Perfil', data.perfil || '—');
+  add('Trailing', data.trailing_mode || 'none');
+  add('Max Trades', data.max_open_trades || 1);
+
+  if (items.length > 0) {
+    banner.innerHTML = items.join('');
+    banner.style.display = 'grid';
+  } else {
+    banner.style.display = 'none';
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -549,6 +648,7 @@ function inicializar(data) {
   document.getElementById('footer-info').textContent =
     `${data.symbol} / ${data.timeframe} · ${data.total_trades} trades · Retorno: ${retPct >= 0 ? '+' : ''}${retPct}%`;
 
+  renderConfigBanner(data);
   renderKPIs(data, retPct);
   renderEquityChart(data);
   renderPnlDist(data);
@@ -920,26 +1020,10 @@ function filtrarTrades(filtro, btn) {
 // Detectar si estamos en un servidor real (no file://)
 const EN_SERVIDOR = window.location.protocol !== 'file:';
 
-// Descubrir archivos reales del servidor via nginx autoindex (JSON)
-async function buscarArchivosServidor() {
+// Descubrir archivos live del servidor
+async function buscarArchivosLive() {
   if (!EN_SERVIDOR) return [];
   const archivos = [];
-
-  // Buscar backtests en /backtest/ (autoindex JSON)
-  try {
-    const r = await fetch('/backtest/?t=' + Date.now(), { cache: 'no-store' });
-    if (r.ok) {
-      const items = await r.json();
-      for (const item of items) {
-        if (item.name && item.name.endsWith('.json')) {
-          const label = item.name.replace('.json', '').replace(/_/g, ' ');
-          archivos.push({ name: 'backtest/' + item.name, type: 'bt', label });
-        }
-      }
-    }
-  } catch {}
-
-  // Buscar logs live en /api/logs/ (autoindex JSON)
   try {
     const r = await fetch('/api/logs/?t=' + Date.now(), { cache: 'no-store' });
     if (r.ok) {
@@ -947,57 +1031,92 @@ async function buscarArchivosServidor() {
       for (const item of items) {
         if (item.name && item.name.startsWith('dashboard_trades_') && item.name.endsWith('.json')) {
           const ymd = item.name.replace('dashboard_trades_', '').replace('.json', '');
-          const label = `Live ${ymd.slice(0,4)}-${ymd.slice(4,6)}-${ymd.slice(6)}`;
-          archivos.push({ name: 'api/logs/' + item.name, type: 'live', label });
+          const label = `${ymd.slice(0,4)}-${ymd.slice(4,6)}-${ymd.slice(6)}`;
+          archivos.push({ name: 'api/logs/' + item.name, label });
         }
       }
     }
   } catch {}
-
-  // Ordenar: live primero (más reciente), luego backtest
-  archivos.sort((a,b) => {
-    if (a.type === 'live' && b.type !== 'live') return -1;
-    if (a.type !== 'live' && b.type === 'live') return 1;
-    return b.name.localeCompare(a.name);
-  });
+  archivos.sort((a,b) => b.name.localeCompare(a.name));
   return archivos;
 }
 
-async function renderServerFiles() {
-  if (!EN_SERVIDOR) return;
+// Descubrir archivos de backtest del servidor
+async function buscarArchivosBacktest() {
+  if (!EN_SERVIDOR) return [];
+  const archivos = [];
+  try {
+    const r = await fetch('/backtest/?t=' + Date.now(), { cache: 'no-store' });
+    if (r.ok) {
+      const items = await r.json();
+      for (const item of items) {
+        if (item.name && item.name.endsWith('.json')) {
+          const label = item.name.replace('.json', '').replace(/_/g, ' ');
+          archivos.push({ name: 'backtest/' + item.name, label });
+        }
+      }
+    }
+  } catch {}
+  archivos.sort((a,b) => b.name.localeCompare(a.name));
+  return archivos;
+}
 
-  document.getElementById('server-files-section').style.display = 'block';
-  document.getElementById('divider-or').style.display = 'flex';
-
-  const lista  = document.getElementById('server-file-list');
-  lista.innerHTML = '<span class="no-server-files">Buscando archivos...</span>';
-
-  const archs  = await buscarArchivosServidor();
-
+function renderFileList(lista, archs, typeClass, typeLabel, emptyMsg) {
   if (archs.length === 0) {
-    lista.innerHTML = '<span class="no-server-files">No se encontraron archivos JSON en el servidor.<br>Corré un backtest o esperá a que el bot genere trades.</span>';
+    lista.innerHTML = `<span class="no-server-files">${emptyMsg}</span>`;
     return;
   }
-
   lista.innerHTML = archs.map(a => `
     <button class="file-btn" onclick="cargarDesdeServidor('${a.name}', this)" title="${a.name}">
-      <span class="file-type ${a.type === 'live' ? 'type-live' : 'type-bt'}">
-        ${a.type === 'live' ? 'LIVE' : 'BT'}
-      </span>
+      <span class="file-type ${typeClass}">${typeLabel}</span>
       ${a.label}
     </button>
   `).join('');
+}
 
-  // Auto-cargar el más reciente (primero de la lista) si no hay dashboard activo
+async function renderLiveFiles() {
+  if (!EN_SERVIDOR) return;
+  document.getElementById('live-files-section').style.display = 'block';
+
+  const lista = document.getElementById('live-file-list');
+  lista.innerHTML = '<span class="no-server-files">Buscando...</span>';
+
+  const archs = await buscarArchivosLive();
+  renderFileList(lista, archs, 'type-live', 'LIVE',
+    'No hay reportes live todavía.<br>Aparecerán cuando el bot genere trades.');
+
+  // Auto-cargar el más reciente si no hay dashboard activo
   if (!DATA && archs.length > 0) {
-    await cargarDesdeServidor(archs[0].name,
-      lista.querySelector('.file-btn'));
+    await cargarDesdeServidor(archs[0].name, lista.querySelector('.file-btn'));
   }
+}
+
+async function renderBacktestFiles() {
+  if (!EN_SERVIDOR) return;
+  document.getElementById('backtest-files-section').style.display = 'block';
+  document.getElementById('divider-or').style.display = 'flex';
+
+  const lista = document.getElementById('backtest-file-list');
+  lista.innerHTML = '<span class="no-server-files">Buscando...</span>';
+
+  const archs = await buscarArchivosBacktest();
+  renderFileList(lista, archs, 'type-bt', 'BT',
+    'No hay backtests en el servidor.<br>Corré un backtest para generar resultados.');
+
+  // Si no hay live y no hay dashboard activo, cargar el backtest más reciente
+  if (!DATA && archs.length > 0) {
+    await cargarDesdeServidor(archs[0].name, lista.querySelector('.file-btn'));
+  }
+}
+
+async function renderServerFiles() {
+  await renderLiveFiles();
+  await renderBacktestFiles();
 }
 
 async function cargarDesdeServidor(filename, btn) {
   try {
-    // Marcar botón activo
+    // Marcar botón activo en ambas listas
     document.querySelectorAll('.file-btn').forEach(b => b.classList.remove('active'));
     if (btn) btn.classList.add('active');
 
@@ -1005,6 +1124,15 @@ async function cargarDesdeServidor(filename, btn) {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const data = await r.json();
     inicializar(data);
+
+    // Si es archivo live, activar auto-refresh
+    if (filename.includes('dashboard_trades_')) {
+      _autoRefreshFile = filename;
+      _autoRefreshBtn  = btn;
+    } else {
+      _autoRefreshFile = null;
+      _autoRefreshBtn  = null;
+    }
   } catch(e) {
     console.error('Error cargando desde servidor:', e);
     alert(`No se pudo cargar ${filename}\n${e.message}`);
@@ -1014,14 +1142,6 @@ async function cargarDesdeServidor(filename, btn) {
 // Auto-refresh cada 60 segundos si hay un archivo activo de tipo live
 let _autoRefreshFile = null;
 let _autoRefreshBtn  = null;
-
-function inicializarConAutoRefresh(data, filename, btn) {
-  inicializar(data);
-  if (filename && filename.includes('dashboard_trades_')) {
-    _autoRefreshFile = filename;
-    _autoRefreshBtn  = btn;
-  }
-}
 
 setInterval(async () => {
   if (!_autoRefreshFile || !EN_SERVIDOR) return;
