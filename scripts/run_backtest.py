@@ -87,7 +87,8 @@ Ejemplos:
     p.add_argument("--racha-reduce",  type=int,   default=3,
                    help="Tras N SL seguidos, reducir a 1 trade (default: 3)")
     p.add_argument("--windows",       default=None,
-                   help="Ventanas horarias UTC. Ej: 8-11,13-18 (override .env)")
+                   help="Ventanas horarias UTC. Ej: 8-11,13-18. Vacío=\"\" = 24h sin filtro. "
+                        "Cuando se pasa --windows, FILTRO_SESION se desactiva automáticamente.")
     p.add_argument("--score",         type=int, default=None,
                    help="Score mínimo (override .env)")
     p.add_argument("--rr",            type=float, default=None,
@@ -100,6 +101,7 @@ Ejemplos:
     from config import strategy as _strat, risk as _risk
     if args.windows is not None:
         _strat.TRADING_WINDOWS_RAW = args.windows
+        _strat.FILTRO_SESION = False  # --windows reemplaza filtro de sesión
     if args.score is not None:
         _strat.SCORE_MINIMO = args.score
     if args.rr is not None:
@@ -244,6 +246,7 @@ def main():
     from config.settings import parse_trading_windows
     windows = parse_trading_windows(scfg.TRADING_WINDOWS_RAW)
     win_str = scfg.TRADING_WINDOWS_RAW if scfg.TRADING_WINDOWS_RAW.strip() else "24h (sin filtro)"
+    sesion_str = f"{'ON — ' + ','.join(scfg.SESIONES_ACTIVAS)}" if scfg.FILTRO_SESION else "OFF"
 
     print(f"\n{'═'*60}")
     print(f"{'  SMC BACKTEST ENGINE':^60}")
@@ -252,6 +255,7 @@ def main():
     print(f"  Capital:   ${args.capital:,.0f} USDT")
     print(f"  Período:   {args.dias} días")
     print(f"  Windows:   {win_str}")
+    print(f"  Sesiones:  {sesion_str}")
     print(f"  Max trades:{args.max_trades}")
     if args.rr:
         print(f"  RR:        1:{args.rr}")

@@ -56,7 +56,8 @@ def parse_args():
     p.add_argument("--racha-reduce",  type=int,   default=3,
                    help="Tras N SL seguidos, reducir a 1 trade (default: 3)")
     p.add_argument("--windows",       default=None,
-                   help="Ventanas horarias UTC. Ej: 8-11,13-18 (override .env)")
+                   help="Ventanas horarias UTC. Ej: 8-11,13-18. Vacío=\"\" = 24h sin filtro. "
+                        "Cuando se pasa --windows, FILTRO_SESION se desactiva automáticamente.")
     p.add_argument("--output",        default=None,
                    help="Nombre del JSON de salida (auto-generado si no se pasa)")
     args = p.parse_args()
@@ -65,6 +66,7 @@ def parse_args():
     if args.windows is not None:
         from config import strategy as _strat
         _strat.TRADING_WINDOWS_RAW = args.windows
+        _strat.FILTRO_SESION = False  # --windows reemplaza filtro de sesión
 
     # Generar nombre de output descriptivo si no se pasó
     if args.output is None:
