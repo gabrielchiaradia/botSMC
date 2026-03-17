@@ -690,8 +690,22 @@ function inicializar(data) {
   mostrarDashboardNormal(data);
 }
 
+const COMPARISON_VIEW_HTML = `
+  <div class="section-title">📊 Comparación de Configuraciones</div>
+  <p style="color:var(--muted);font-size:11px;margin-bottom:16px;">Click en una fila para ver el dashboard completo de esa configuración</p>
+  <div style="overflow-x:auto">
+    <table id="comparison-table">
+      <thead><tr id="comparison-thead"></tr></thead>
+      <tbody id="comparison-tbody"></tbody>
+    </table>
+  </div>
+`;
+
 function mostrarComparacion(data) {
-  document.getElementById('comparison-view').style.display = 'block';
+  const compView = document.getElementById('comparison-view');
+  // Siempre restaurar la estructura de la tabla
+  compView.innerHTML = COMPARISON_VIEW_HTML;
+  compView.style.display = 'block';
   document.getElementById('dashboard-content').style.display = 'none';
   document.getElementById('config-banner').style.display = 'none';
 
@@ -766,16 +780,10 @@ function cargarPerfilDesdeComparacion(idx) {
   if (!_comparacionData || !_comparacionData.perfiles[idx]) return;
   const perfil = _comparacionData.perfiles[idx];
 
-  // Guardar HTML original de la tabla de comparación
   const compView = document.getElementById('comparison-view');
-  if (!compView._originalHTML) compView._originalHTML = compView.innerHTML;
-
-  // Reemplazar tabla con botón de volver
   compView.innerHTML =
     '<button class="comp-back-btn" onclick="volverAComparacion()">← Volver a comparación</button>';
   compView.style.display = 'block';
-
-  // Mostrar dashboard normal SIN ocultar comparison-view
   document.getElementById('dashboard-content').style.display = 'block';
 
   const retPct = ((perfil.capital_final - perfil.capital_inicial) / perfil.capital_inicial * 100).toFixed(2);
@@ -797,11 +805,6 @@ function cargarPerfilDesdeComparacion(idx) {
 
 function volverAComparacion() {
   if (!_comparacionData) return;
-  const compView = document.getElementById('comparison-view');
-  if (compView._originalHTML) {
-    compView.innerHTML = compView._originalHTML;
-    compView._originalHTML = null;
-  }
   mostrarComparacion(_comparacionData);
 }
 
