@@ -115,7 +115,7 @@ footer { border-top: 3px double var(--rule); padding: 24px 0; margin-top: 60px; 
   <h3>Desde Windows (CMD o PowerShell)</h3>
   <div class="code-block">
     <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">ssh</span> -i C:\Users\Gabriel\.ssh\id_ed25519 root@167.179.114.168</pre>
+    <pre><span class="cmd">ssh</span> -i C:\Users\Gabriel\.ssh\id_ed25519 <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="0f7d60607b4f3e3938213e3836213e3e3b213e3937">[email&#160;protected]</a></pre>
   </div>
 
   <h3>Cambiar al usuario botuser</h3>
@@ -472,7 +472,7 @@ footer { border-top: 3px double var(--rule); padding: 24px 0; margin-top: 60px; 
   <h3>Conexión SSH</h3>
   <table>
     <tr><th>Acción</th><th>Comando</th></tr>
-    <tr><td>Conectarse al VPS</td><td><code>ssh -i C:\Users\Gabriel\.ssh\id_ed25519 root@167.179.114.168</code></td></tr>
+    <tr><td>Conectarse al VPS</td><td><code>ssh -i C:\Users\Gabriel\.ssh\id_ed25519 <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="90e2ffffe4d0a1a6a7bea1a7a9bea1a1a4bea1a6a8">[email&#160;protected]</a></code></td></tr>
     <tr><td>Cambiar a botuser</td><td><code>su - botuser</code></td></tr>
     <tr><td>Ir al proyecto</td><td><code>cd ~/smc-bot</code></td></tr>
   </table>
@@ -533,22 +533,8 @@ footer { border-top: 3px double var(--rule); padding: 24px 0; margin-top: 60px; 
 
 </div><!-- /page -->
 
-<script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 function copiar(btn) {
   var pre = btn.parentElement.querySelector('pre');
   var texto = pre.innerText;
-  navigator.clipboard.writeText(texto).then(function() {
-    btn.textContent = '✓ copiado';
-    btn.classList.add('copied');
-    setTimeout(function() {
-      btn.textContent = 'copiar';
-      btn.classList.remove('copied');
-    }, 2000);
-  }).catch(function() {
-    btn.textContent = 'error';
-    setTimeout(function() { btn.textContent = 'copiar'; }, 2000);
-  });
-}
-</script>
-</body>
-</html>
+  navigator.clipboard.writeText(texto).the
