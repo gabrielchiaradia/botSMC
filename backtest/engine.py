@@ -394,7 +394,7 @@ class BacktestEngine:
         pos.timestamp_out  = str(ts_out)
         pos.precio_salida  = round(precio_cierre, 2)
         pos.pnl_usd        = round(pnl, 4)
-        pos.pnl_pct        = round(pnl / self.capital0 * 100, 3)
+        pos.pnl_pct        = round(pnl / pos.capital_in * 100, 3) if pos.capital_in > 0 else 0.0
         pos.resultado      = "WIN" if pnl > 0 else "LOSS"
         pos.duracion_min   = dur
         pos.capital_post   = round(self._capital, 2)
