@@ -278,6 +278,24 @@
   .pnl-pos { color: var(--green); font-weight: 700; }
   .pnl-neg { color: var(--red);   font-weight: 700; }
 
+  /* ─── COMPARISON TABLE ─── */
+  #comparison-table tr { cursor: pointer; transition: background 0.15s; }
+  #comparison-table tbody tr:hover td { background: rgba(0,212,255,0.08); }
+  #comparison-table .best-row td { border-left-color: var(--green); }
+  #comparison-table .best-row td:first-child {
+    border-left: 3px solid var(--green);
+  }
+  .comp-best { color: var(--green); font-weight: 700; }
+  .comp-worst { color: var(--red); opacity: 0.7; }
+  .comp-back-btn {
+    padding: 6px 16px; margin-bottom: 16px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; cursor: pointer; transition: all 0.2s;
+  }
+  .comp-back-btn:hover { background: var(--accent); color: var(--bg); }
+
   /* filter tabs */
   .filter-tabs { display:flex; gap:8px; }
   .filter-tab {
@@ -468,6 +486,21 @@
     <!-- CONFIG BANNER -->
     <div class="config-banner" id="config-banner" style="display:none"></div>
 
+    <!-- COMPARISON VIEW (for systematic results) -->
+    <div id="comparison-view" style="display:none">
+      <div class="section-title">📊 Comparación de Configuraciones</div>
+      <p style="color:var(--muted);font-size:11px;margin-bottom:16px;">Click en una fila para ver el dashboard completo de esa configuración</p>
+      <div style="overflow-x:auto">
+        <table id="comparison-table">
+          <thead><tr id="comparison-thead"></tr></thead>
+          <tbody id="comparison-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- NORMAL DASHBOARD CONTENT -->
+    <div id="dashboard-content">
+
     <!-- KPIs -->
     <div class="section-title">📈 Resumen de Performance</div>
     <div class="kpi-grid" id="kpi-grid"></div>
@@ -561,6 +594,8 @@
       </div>
     </div>
 
+    </div><!-- /dashboard-content -->
+
   </div><!-- /dashboard -->
 </main>
 
@@ -637,10 +672,40 @@ function renderConfigBanner(data) {
 // ═══════════════════════════════════════════
 //  INICIALIZAR DASHBOARD
 // ═══════════════════════════════════════════
+let _comparacionData = null;  // guardar para "volver a comparación"
+
 function inicializar(data) {
   DATA = data;
   document.getElementById('upload-zone').style.display = 'none';
   document.getElementById('dashboard').style.display   = 'block';
+
+  // Detectar si es archivo de comparación (systematic)
+  if (data.comparacion && data.perfiles) {
+    _comparacionData = data;
+    mostrarComparacion(data);
+    return;
+  }
+
+  // Dashboard normal (un solo backtest)
+  mostrarDashboardNormal(data);
+}
+
+function mostrarComparacion(data) {
+  document.getElementById('comparison-view').style.display = 'block';
+  document.getElementById('dashboard-content').style.display = 'none';
+  document.getElementById('config-banner').style.display = 'none';
+
+  document.getElementById('header-period').textContent =
+    `Systematic · ${data.perfiles.length} configuraciones`;
+  document.getElementById('footer-info').textContent =
+    `Comparación generada: ${(data.fecha || '').slice(0,19)}`;
+
+  renderComparacionTable(data.perfiles);
+}
+
+function mostrarDashboardNormal(data) {
+  document.getElementById('comparison-view').style.display = 'none';
+  document.getElementById('dashboard-content').style.display = 'block';
 
   const retPct = ((data.capital_final - data.capital_inicial) / data.capital_inicial * 100).toFixed(2);
   document.getElementById('header-period').textContent =
@@ -657,6 +722,87 @@ function inicializar(data) {
   renderMonthChart(data);
   renderSessions(data);
   renderTradesTable(data.trades || [], true);
+}
+
+function renderComparacionTable(perfiles) {
+  const thead = document.getElementById('comparison-thead');
+  const tbody = document.getElementById('comparison-tbody');
+
+  // Encontrar el mejor retorno para destacar
+  const retornos = perfiles.map(p =>
+    ((p.capital_final - p.capital_inicial) / p.capital_inicial * 100));
+  const mejorRet = Math.max(...retornos);
+
+  thead.innerHTML = `
+    <th>#</th><th>Symbol</th><th>TF</th><th>Perfil</th><th>Trailing</th>
+    <th>RR</th><th>Retorno</th><th>Win Rate</th><th>PF</th>
+    <th>Trades</th><th>DD%</th><th>Sharpe</th>
+  `;
+
+  tbody.innerHTML = perfiles.map((p, i) => {
+    const ret = retornos[i];
+    const isBest = ret === mejorRet;
+    const retClass = ret >= 0 ? 'pnl-pos' : 'pnl-neg';
+    const rowClass = isBest ? 'best-row' : '';
+
+    return `<tr class="${rowClass}" onclick="cargarPerfilDesdeComparacion(${i})" title="Click para ver dashboard completo">
+      <td>${i + 1}</td>
+      <td>${p.symbol || '—'}</td>
+      <td>${p.timeframe || '—'}</td>
+      <td>${p.perfil || '—'}</td>
+      <td>${p.trailing_mode || 'none'}</td>
+      <td>${p.tp_rr_ratio ? '1:' + p.tp_rr_ratio : '—'}</td>
+      <td class="${retClass}">${ret >= 0 ? '+' : ''}${ret.toFixed(1)}%</td>
+      <td>${(p.win_rate || 0).toFixed(0)}%</td>
+      <td>${(p.profit_factor || 0).toFixed(2)}</td>
+      <td>${p.total_trades || 0}</td>
+      <td>${(p.max_drawdown_pct || 0).toFixed(1)}%</td>
+      <td>${(p.sharpe_ratio || 0).toFixed(2)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function cargarPerfilDesdeComparacion(idx) {
+  if (!_comparacionData || !_comparacionData.perfiles[idx]) return;
+  const perfil = _comparacionData.perfiles[idx];
+
+  // Guardar HTML original de la tabla de comparación
+  const compView = document.getElementById('comparison-view');
+  if (!compView._originalHTML) compView._originalHTML = compView.innerHTML;
+
+  // Reemplazar tabla con botón de volver
+  compView.innerHTML =
+    '<button class="comp-back-btn" onclick="volverAComparacion()">← Volver a comparación</button>';
+  compView.style.display = 'block';
+
+  // Mostrar dashboard normal SIN ocultar comparison-view
+  document.getElementById('dashboard-content').style.display = 'block';
+
+  const retPct = ((perfil.capital_final - perfil.capital_inicial) / perfil.capital_inicial * 100).toFixed(2);
+  document.getElementById('header-period').textContent =
+    `${perfil.fecha_inicio.slice(0,10)} → ${perfil.fecha_fin.slice(0,10)}`;
+  document.getElementById('footer-info').textContent =
+    `${perfil.symbol} / ${perfil.timeframe} · ${perfil.total_trades} trades · Retorno: ${retPct >= 0 ? '+' : ''}${retPct}%`;
+
+  renderConfigBanner(perfil);
+  renderKPIs(perfil, retPct);
+  renderEquityChart(perfil);
+  renderPnlDist(perfil);
+  renderCumulativePnl(perfil);
+  renderHourChart(perfil);
+  renderMonthChart(perfil);
+  renderSessions(perfil);
+  renderTradesTable(perfil.trades || [], true);
+}
+
+function volverAComparacion() {
+  if (!_comparacionData) return;
+  const compView = document.getElementById('comparison-view');
+  if (compView._originalHTML) {
+    compView.innerHTML = compView._originalHTML;
+    compView._originalHTML = null;
+  }
+  mostrarComparacion(_comparacionData);
 }
 
 // ═══════════════════════════════════════════
