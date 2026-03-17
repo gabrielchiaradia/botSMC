@@ -100,13 +100,15 @@ class TradeJournal:
 
     def __init__(self, log_dir: Path = None, symbol: str = "BTCUSDT",
                  timeframe: str = "15m", modo: str = "PAPER",
-                 max_open: int = 1):
-        from config.settings import logs as lcfg, risk as rcfg
+                 max_open: int = 1, bot_tag: str = ""):
+        from config.settings import logs as lcfg, risk as rcfg, BOT_NUMBER
         self.log_dir    = log_dir or lcfg.LOG_DIR
         self.symbol     = symbol
         self.timeframe  = timeframe
         self.modo       = modo
         self.max_open   = max_open or rcfg.MAX_OPEN_TRADES
+        self.bot_tag    = bot_tag
+        self._bot_num   = BOT_NUMBER
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
         self._fecha           = datetime.now().strftime("%Y%m%d")
@@ -114,18 +116,23 @@ class TradeJournal:
         self._trade_counter   = self._contar_trades_hoy()
         self._racha_sl        = 0    # SL consecutivos
 
-        logger.info("TradeJournal iniciado | Modo: %s | Max open: %d | Dir: %s",
-                    modo, self.max_open, self.log_dir)
+        logger.info("[%s] TradeJournal iniciado | Modo: %s | Max open: %d | Dir: %s",
+                    bot_tag or "Bot1", modo, self.max_open, self.log_dir)
 
     # ── Paths de archivos ──────────────────────────────────
 
     @property
+    def _bot_suffix(self) -> str:
+        """Sufijo para archivos: '' para bot 1, '_2' para bot 2, etc."""
+        return f"_{self._bot_num}" if self._bot_num > 1 else ""
+
+    @property
     def _signals_path(self) -> Path:
-        return self.log_dir / f"signals_{self._fecha}.json"
+        return self.log_dir / f"signals{self._bot_suffix}_{self._fecha}.json"
 
     @property
     def _trades_path(self) -> Path:
-        return self.log_dir / f"trades_{self._fecha}.json"
+        return self.log_dir / f"trades{self._bot_suffix}_{self._fecha}.json"
 
     # ── API pública ────────────────────────────────────────
 

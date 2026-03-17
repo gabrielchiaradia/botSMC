@@ -43,9 +43,10 @@ class TelegramNotifier:
 
     BASE_URL = "https://api.telegram.org/bot{token}/{method}"
 
-    def __init__(self, token: str, chat_id: str):
+    def __init__(self, token: str, chat_id: str, bot_tag: str = ""):
         self.token   = token
         self.chat_id = chat_id
+        self.bot_tag = bot_tag
         self._habilitado = bool(token and chat_id)
         if not self._habilitado:
             logger.warning("Telegram no configurado (TOKEN o CHAT_ID vacíos). "
@@ -185,6 +186,10 @@ class TelegramNotifier:
             logger.debug("Telegram deshabilitado, mensaje no enviado.")
             return False
 
+        # Prefijar con tag del bot si está configurado
+        if self.bot_tag:
+            texto = f"[{self.bot_tag}]\n{texto}"
+
         url  = self.BASE_URL.format(token=self.token, method="sendMessage")
 
         for modo in [parse_mode, None]:
@@ -231,10 +236,11 @@ class TelegramNotifier:
 #  FACTORY
 # ══════════════════════════════════════════════════════════
 
-def crear_notifier() -> TelegramNotifier:
+def crear_notifier(bot_tag: str = "") -> TelegramNotifier:
     """Crea instancia usando credenciales del .env."""
     from config import creds
     return TelegramNotifier(
         token   = creds.TELEGRAM_TOKEN,
         chat_id = creds.TELEGRAM_CHAT_ID,
+        bot_tag = bot_tag,
     )

@@ -1178,10 +1178,16 @@ async function buscarArchivosLive() {
     if (r.ok) {
       const items = await r.json();
       for (const item of items) {
-        if (item.name && item.name.startsWith('dashboard_trades_') && item.name.endsWith('.json')) {
-          const ymd = item.name.replace('dashboard_trades_', '').replace('.json', '');
-          const label = `${ymd.slice(0,4)}-${ymd.slice(4,6)}-${ymd.slice(6)}`;
-          archivos.push({ name: 'api/logs/' + item.name, label });
+        if (item.name && item.name.startsWith('dashboard_trades') && item.name.endsWith('.json')) {
+          // Formatos: dashboard_trades_YYYYMMDD.json (bot1)
+          //           dashboard_trades_N_YYYYMMDD.json (bot N)
+          const match = item.name.match(/dashboard_trades_?(\d+)?_?(\d{8})\.json/);
+          if (match) {
+            const botNum = match[1] && match[1].length <= 2 ? match[1] : '1';
+            const ymd = match[2] || match[1];  // fallback si no hay bot number
+            const label = `Bot${botNum} · ${ymd.slice(0,4)}-${ymd.slice(4,6)}-${ymd.slice(6)}`;
+            archivos.push({ name: 'api/logs/' + item.name, label });
+          }
         }
       }
     }

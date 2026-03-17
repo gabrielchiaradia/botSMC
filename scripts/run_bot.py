@@ -6,23 +6,34 @@ Bot completo con:
   - WebSocket en tiempo real (reacciona al cierre de cada vela)
   - Notificaciones Telegram
   - Journal completo de señales y trades
+  - Multi-bot: --bot-number N carga .envN
 
 Uso:
-    python scripts/run_bot.py               # Paper trading
+    python scripts/run_bot.py               # Paper trading (Bot 1, .env)
     python scripts/run_bot.py --live        # Órdenes en Testnet
-    python scripts/run_bot.py --poll        # Forzar polling (sin WebSocket)
+    python scripts/run_bot.py --bot-number 2  # Bot 2, carga .env2
 """
 
 import sys
+import os
 import time
 import argparse
 import json
 from pathlib import Path
-from datetime import datetime
+
+# ── Pre-parsear --bot-number ANTES de importar config ────────────────────
+# Esto permite que config/settings.py lea la variable BOT_NUMBER
+# y cargue el .env correcto.
+_pre_parser = argparse.ArgumentParser(add_help=False)
+_pre_parser.add_argument("--bot-number", type=int, default=None)
+_pre_args, _ = _pre_parser.parse_known_args()
+if _pre_args.bot_number is not None:
+    os.environ["BOT_NUMBER"] = str(_pre_args.bot_number)
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from datetime import datetime
 
-from config import creds, exchange as excfg, mtf as mcfg, ws as wscfg
+from config import creds, exchange as excfg, mtf as mcfg, ws as wscfg, BOT_TAG, BOT_NUMBER
 from config.settings import logs as lcfg
 from data import (
     crear_cliente_futures,
@@ -51,6 +62,8 @@ def parse_args():
                    help="Ejecutar ordenes reales en Testnet")
     p.add_argument("--poll", action="store_true",
                    help="Usar polling REST en lugar de WebSocket")
+    p.add_argument("--bot-number", type=int, default=1,
+                   help="Número de bot (1=.env, 2=.env2, etc.)")
     return p.parse_args()
 
 
@@ -251,8 +264,11 @@ def exportar_dashboard(journal):
     datos = journal.exportar_como_backtest()
     if not datos:
         return
+    # Agregar bot_tag al export para que el dashboard lo muestre
+    datos["bot_tag"] = journal.bot_tag
     lcfg.LOG_DIR.mkdir(parents=True, exist_ok=True)
-    path = lcfg.LOG_DIR / f"dashboard_trades_{datetime.now().strftime('%Y%m%d')}.json"
+    suffix = f"_{journal._bot_num}" if journal._bot_num > 1 else ""
+    path = lcfg.LOG_DIR / f"dashboard_trades{suffix}_{datetime.now().strftime('%Y%m%d')}.json"
     try:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(datos, f, ensure_ascii=False, indent=2, default=str)
@@ -291,8 +307,9 @@ def main():
     from config import risk as rcfg
 
     print(f"\n{'='*60}")
-    print(f"{'  SMC BOT v2':^60}")
+    print(f"{'  SMC BOT v2 — ' + BOT_TAG:^60}")
     print(f"{'='*60}")
+    print(f"  Bot:        #{BOT_NUMBER} ({BOT_TAG})")
     print(f"  Par:        {excfg.SYMBOL}")
     print(f"  LTF:        {mcfg.LTF}  (entrada)")
     print(f"  HTF:        {mcfg.HTF}  (contexto)")
@@ -316,10 +333,10 @@ def main():
 
     # ── Servicios ─────────────────────────────────────────
     journal  = TradeJournal(symbol=excfg.SYMBOL, timeframe=mcfg.LTF, modo=modo,
-                            max_open=rcfg.MAX_OPEN_TRADES)
-    notifier = crear_notifier()
+                            max_open=rcfg.MAX_OPEN_TRADES, bot_tag=BOT_TAG)
+    notifier = crear_notifier(bot_tag=BOT_TAG)
     balance_ref = [obtener_balance_usdt(client) if client else 1000.0]
-    logger.info("Balance inicial: $%.2f USDT", balance_ref[0])
+    logger.info("[%s] Balance inicial: $%.2f USDT", BOT_TAG, balance_ref[0])
 
     notifier.bot_iniciado(excfg.SYMBOL, mcfg.LTF, mcfg.HTF, modo, balance_ref[0])
 

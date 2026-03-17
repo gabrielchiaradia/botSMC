@@ -4,15 +4,30 @@ config/settings.py
 Centraliza TODA la configuración del bot.
 Las credenciales se cargan desde variables de entorno (.env),
 NUNCA se hardcodean aquí.
+
+Multi-bot: si BOT_NUMBER está seteado (ej: 2), carga .env2.
+           Si es 1 o no está seteado, carga .env (default).
 """
 
 import os
 from dotenv import load_dotenv
 from pathlib import Path
 
-# ── Cargar .env desde la raíz del proyecto ────────────────────────────────
+# ── Determinar qué .env cargar ──────────────────────────────────────────────
 ROOT_DIR = Path(__file__).resolve().parents[1]
-load_dotenv(ROOT_DIR / ".env")
+BOT_NUMBER = int(os.getenv("BOT_NUMBER", "1"))
+_env_file  = ROOT_DIR / (f".env{BOT_NUMBER}" if BOT_NUMBER > 1 else ".env")
+
+if not _env_file.exists() and BOT_NUMBER > 1:
+    raise FileNotFoundError(
+        f"No se encontró {_env_file}. Creá el archivo .env{BOT_NUMBER} "
+        f"con la configuración para el bot #{BOT_NUMBER}."
+    )
+
+load_dotenv(_env_file)
+
+# Tag identificador del bot (usado en logs y Telegram)
+BOT_TAG = os.getenv("BOT_TAG", f"Bot{BOT_NUMBER}")
 
 
 # ══════════════════════════════════════════════════════════
@@ -111,7 +126,7 @@ class BacktestConfig:
 class LogConfig:
     LEVEL:    str  = os.getenv("LOG_LEVEL", "INFO")
     LOG_DIR:  Path = ROOT_DIR / "logs"
-    LOG_FILE: str  = "smc_bot.log"
+    LOG_FILE: str  = f"smc_bot_{BOT_NUMBER}.log" if BOT_NUMBER > 1 else "smc_bot.log"
     LOG_PATH: Path = LOG_DIR / LOG_FILE
 
 
