@@ -60,13 +60,28 @@ Ejemplos:
     p.add_argument("--top", type=int, default=None,
                    help="Mostrar solo los N mejores resultados")
     p.add_argument("--sort", default="ret",
-                   choices=["ret", "pf", "wr", "dd", "trades", "sharpe"],
-                   help="Ordenar por: ret, pf, wr, dd, trades, sharpe (default: ret)")
+                   choices=["ret", "pf", "wr", "dd", "trades", "sharpe",
+                            "symbol", "timeframe", "strategy", "windows"],
+                   help="Ordenar por: ret, pf, wr, dd, trades, sharpe, symbol, timeframe, strategy, windows")
     p.add_argument("--min-trades", type=int, default=0,
                    help="Filtrar resultados con menos de N trades")
     p.add_argument("--csv", default=None,
                    help="Exportar comparación a CSV")
     return p.parse_args()
+
+
+import re
+
+
+def _extraer_windows(nombre: str) -> str:
+    """Extrae la ventana horaria del nombre del archivo.
+    Ej: bt_ethusdt_15m_ob_bos_none_180d_mt3_w13-16_rr1.5 → 13-16
+        bt_ethusdt_1h_base_none_180d_mt3_rr2.5 → 24h
+    """
+    m = re.search(r'_w(\d+-\d+(?:_\d+-\d+)*)', nombre)
+    if m:
+        return m.group(1).replace('_', ',')
+    return "24h"
 
 
 def cargar_json(path: str) -> dict:
@@ -99,6 +114,7 @@ def cargar_json(path: str) -> dict:
         "trailing":   data.get("trailing_mode", "?"),
         "rr_config":  data.get("tp_rr_ratio", data.get("rr_ratio_config", "?")),
         "dias":       data.get("dias_backtest", data.get("dias", "?")),
+        "windows":    _extraer_windows(nombre),
         "ret":        round(ret, 2),
         "trades":     data.get("total_trades", 0),
         "wr":         data.get("win_rate", 0),
@@ -154,7 +170,17 @@ def mostrar_tabla(resultados: list, sort_key: str, top_n: int = None):
     if sort_key == "dd":
         reverse = False  # Menor DD es mejor
 
-    resultados.sort(key=lambda r: r.get(sort_key, 0), reverse=reverse)
+    # Mapear alias de sort a campos
+    sort_field = sort_key
+    if sort_key == "strategy":
+        sort_field = "perfil"
+
+    # String columns: ordenar alphabetically asc
+    string_cols = {"symbol", "timeframe", "perfil", "windows", "strategy"}
+    if sort_key in string_cols:
+        resultados.sort(key=lambda r: str(r.get(sort_field, "")))
+    else:
+        resultados.sort(key=lambda r: r.get(sort_field, 0), reverse=reverse)
 
     if top_n:
         resultados = resultados[:top_n]
@@ -167,8 +193,9 @@ def mostrar_tabla(resultados: list, sort_key: str, top_n: int = None):
     print(f"{'─' * 120}")
 
     # Columnas
-    print(f"  {'#':>3}  {'Nombre':<40} {'Días':>5} {'RR':>5} {'Ret':>8} {'Trades':>7} {'WR':>7} {'PF':>7} {'DD':>7} {'AvgRR':>6} {'Cap.Fin':>10}")
-    print(f"  {'─'*3}  {'─'*40} {'─'*5} {'─'*5} {'─'*8} {'─'*7} {'─'*7} {'─'*7} {'─'*7} {'─'*6} {'─'*10}")
+    W = 150
+    print(f"  {'#':>3}  {'Symbol':<8} {'TF':<4} {'Strategy':<10} {'Win':<6} {'Días':>5} {'RR':>5} {'Ret':>8} {'Trades':>7} {'WR':>7} {'PF':>7} {'DD':>7} {'AvgRR':>6} {'Cap.Fin':>10}")
+    print(f"  {'─'*3}  {'─'*8} {'─'*4} {'─'*10} {'─'*6} {'─'*5} {'─'*5} {'─'*8} {'─'*7} {'─'*7} {'─'*7} {'─'*7} {'─'*6} {'─'*10}")
 
     for i, r in enumerate(resultados, 1):
         ret = r["ret"]
@@ -177,12 +204,15 @@ def mostrar_tabla(resultados: list, sort_key: str, top_n: int = None):
         dd_color = GREEN if r["dd"] <= 10 else YELLOW if r["dd"] <= 20 else RED
         wr_color = GREEN if r["wr"] >= 40 else YELLOW if r["wr"] >= 30 else RED
 
-        nombre = r["nombre"][:40]
         dias = str(r.get("dias", "?"))
         rr = r.get("rr_config", "?")
         rr_str = f"1:{rr}" if rr != "?" else "?"
+        sym = r.get("symbol", "?")[:8]
+        tf = r.get("timeframe", "?")[:4]
+        strat = r.get("perfil", "?")[:10]
+        win = r.get("windows", "24h")[:6]
 
-        print(f"  {i:>3}  {nombre:<40} "
+        print(f"  {i:>3}  {sym:<8} {tf:<4} {strat:<10} {win:<6} "
               f"{dias:>5} "
               f"{rr_str:>5} "
               f"{ret_color}{ret:>+7.2f}%{RESET} "
@@ -199,10 +229,10 @@ def mostrar_tabla(resultados: list, sort_key: str, top_n: int = None):
     if len(resultados) >= 2:
         mejor = resultados[0]
         peor = resultados[-1]
-        print(f"\n  {GREEN}★ MEJOR:{RESET} {mejor['nombre']}")
+        print(f"\n  {GREEN}★ MEJOR:{RESET} {mejor['symbol']} / {mejor['timeframe']} / {mejor['perfil']} / w:{mejor.get('windows','24h')}")
         print(f"    Ret: {mejor['ret']:+.2f}%  |  {mejor['trades']} trades  |  "
               f"WR {mejor['wr']:.1f}%  |  PF {mejor['pf']:.3f}  |  DD {mejor['dd']:.1f}%")
-        print(f"\n  {RED}✗ PEOR:{RESET}  {peor['nombre']}")
+        print(f"\n  {RED}✗ PEOR:{RESET}  {peor['symbol']} / {peor['timeframe']} / {peor['perfil']} / w:{peor.get('windows','24h')}")
         print(f"    Ret: {peor['ret']:+.2f}%  |  {peor['trades']} trades  |  "
               f"WR {peor['wr']:.1f}%  |  PF {peor['pf']:.3f}  |  DD {peor['dd']:.1f}%")
 
@@ -212,7 +242,7 @@ def mostrar_tabla(resultados: list, sort_key: str, top_n: int = None):
 def exportar_csv(resultados: list, path: str):
     """Exporta la comparación a CSV."""
     import csv
-    campos = ["nombre", "archivo", "symbol", "timeframe", "perfil", "trailing",
+    campos = ["nombre", "archivo", "symbol", "timeframe", "perfil", "trailing", "windows",
               "ret", "trades", "wr", "pf", "dd", "sharpe", "cap_ini", "cap_fin",
               "avg_win", "avg_loss", "avg_rr", "max_r", "filtradas"]
 
