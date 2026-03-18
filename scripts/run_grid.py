@@ -470,14 +470,18 @@ def parse_args():
                    help="Ejecutar órdenes reales")
     p.add_argument("--backtest", action="store_true",
                    help="Correr backtest con datos históricos")
+    p.add_argument("--auto-range", action="store_true", default=True,
+                   help="Calcular rango automáticamente desde datos históricos (default: on)")
+    p.add_argument("--no-auto-range", action="store_true",
+                   help="Usar GRID_UPPER/GRID_LOWER del .env sin auto-calcular")
     p.add_argument("--dias", type=int, default=180,
                    help="Días de historia para backtest (default: 180)")
     p.add_argument("--symbol", default=None,
                    help="Override GRID_SYMBOL del .env")
     p.add_argument("--upper", type=float, default=None,
-                   help="Override GRID_UPPER")
+                   help="Override GRID_UPPER (desactiva auto-range)")
     p.add_argument("--lower", type=float, default=None,
-                   help="Override GRID_LOWER")
+                   help="Override GRID_LOWER (desactiva auto-range)")
     p.add_argument("--count", type=int, default=None,
                    help="Override GRID_COUNT")
     p.add_argument("--capital", type=float, default=None,
@@ -487,10 +491,31 @@ def parse_args():
     return p.parse_args()
 
 
+def calcular_rango_auto(df, margen_pct: float = 5.0):
+    """
+    Calcula el rango del grid basándose en percentiles de los precios.
+    Usa P5-P95 para evitar outliers y agrega un margen.
+    """
+    import numpy as np
+    precios = df["close"].values
+    p5  = np.percentile(precios, 5)
+    p95 = np.percentile(precios, 95)
+
+    # Agregar margen
+    rango = p95 - p5
+    lower = round(p5 - rango * (margen_pct / 100), 2)
+    upper = round(p95 + rango * (margen_pct / 100), 2)
+
+    # No bajar de 0
+    lower = max(lower, round(p5 * 0.9, 2))
+
+    return lower, upper
+
+
 # ══════════════════════════════════════════════════════════
 #  GRID BACKTEST
 # ══════════════════════════════════════════════════════════
-def run_grid_backtest(cfg: GridConfig, dias: int):
+def run_grid_backtest(cfg: GridConfig, dias: int, auto_range: bool = True):
     """Backtest del grid bot usando datos históricos."""
     from data.fetcher import obtener_historico_backtest
 
@@ -498,9 +523,6 @@ def run_grid_backtest(cfg: GridConfig, dias: int):
     print(f"{'  GRID BACKTEST':^60}")
     print(f"{'='*60}")
     print(f"  Par:        {cfg.SYMBOL}")
-    print(f"  Rango:      ${cfg.LOWER:,.2f} — ${cfg.UPPER:,.2f}")
-    print(f"  Niveles:    {cfg.COUNT}")
-    print(f"  Step:       ${(cfg.UPPER - cfg.LOWER) / cfg.COUNT:,.2f}")
     print(f"  Capital:    ${cfg.CAPITAL:,.2f} USDT")
     print(f"  Período:    {dias} días")
     print(f"  Cargando datos históricos...")
@@ -512,6 +534,15 @@ def run_grid_backtest(cfg: GridConfig, dias: int):
         return
 
     print(f"  {len(df)} velas | {df.index[0]} → {df.index[-1]}")
+
+    # Auto-calcular rango si está habilitado
+    if auto_range:
+        cfg.LOWER, cfg.UPPER = calcular_rango_auto(df)
+        print(f"  Auto-rango: ${cfg.LOWER:,.2f} — ${cfg.UPPER:,.2f} (P5-P95 + margen)")
+
+    print(f"  Rango Grid: ${cfg.LOWER:,.2f} — ${cfg.UPPER:,.2f}")
+    print(f"  Niveles:    {cfg.COUNT}")
+    print(f"  Step:       ${(cfg.UPPER - cfg.LOWER) / cfg.COUNT:,.2f}")
     print(f"{'='*60}\n")
 
     # Crear grid bot en modo paper
@@ -675,9 +706,14 @@ def main():
     if args.count:   cfg.COUNT = args.count
     if args.capital: cfg.CAPITAL = args.capital
 
+    # Auto-range: desactivar si se pasaron upper/lower explícitos o --no-auto-range
+    use_auto_range = args.auto_range and not args.no_auto_range
+    if args.upper or args.lower:
+        use_auto_range = False
+
     # Modo backtest
     if args.backtest:
-        run_grid_backtest(cfg, args.dias)
+        run_grid_backtest(cfg, args.dias, auto_range=use_auto_range)
         return
 
     modo = "LIVE" if args.live else "PAPER"
@@ -705,6 +741,19 @@ def main():
         from binance.client import Client
         client = Client(cfg.API_KEY, cfg.API_SECRET, testnet=cfg.TESTNET)
         logger.info("Cliente Binance Spot conectado. Testnet=%s", cfg.TESTNET)
+
+    # ── Auto-range en live: centrar grid alrededor del precio actual ──
+    if use_auto_range and client:
+        ticker = client.get_symbol_ticker(symbol=cfg.SYMBOL)
+        precio_actual = float(ticker["price"])
+        rango_pct = 15  # ±15% del precio
+        cfg.LOWER = round(precio_actual * (1 - rango_pct / 100), 2)
+        cfg.UPPER = round(precio_actual * (1 + rango_pct / 100), 2)
+        logger.info("Auto-rango: $%.2f — $%.2f (±%d%% de $%.2f)",
+                    cfg.LOWER, cfg.UPPER, rango_pct, precio_actual)
+
+    print(f"  Rango:      ${cfg.LOWER:,.2f} — ${cfg.UPPER:,.2f}")
+    print(f"  Auto-range: {'ON' if use_auto_range else 'OFF'}")
 
     # ── Telegram ──────────────────────────────────────────
     notifier = TelegramNotifier(
