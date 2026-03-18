@@ -2,99 +2,90 @@
 
 Bot de trading algorítmico para **Binance Futures** basado en **Smart Money Concepts (SMC)**.
 Detecta Fair Value Gaps, Order Blocks y BOS/CHoCH en tiempo real y en backtesting.
-Sistema de **perfiles de estrategia**, **trailing dinámico**, **multi-trade**, **ventanas horarias**, **riesgo adaptativo** y **multi-bot**.
 
-## 🏆 Configuraciones validadas (360 días)
+Multi-bot, multi-estrategia, grid bot spot, backtesting interactivo, dashboards con tema dark/light.
 
-### Bot 1 — Conservador (15m, ob_bos, ventana 13-16)
-```
-SYMBOL=ETHUSDT | MTF_LTF=15m | MTF_HTF=1h | TP_RR_RATIO=1.5
-MAX_OPEN_TRADES=3 | TRADING_WINDOWS=13-16 | Perfil: ob_bos
-Resultado: +51% | 69% WR | PF 2.78 | DD 5.1% | 71 trades
-```
+## 🏆 Configuraciones validadas (ETHUSDT, 360 días)
 
-### Bot 2 — Agresivo (1h, base, 24hs)
-```
-SYMBOL=ETHUSDT | TIMEFRAME=1h | MTF_ENABLED=false | TP_RR_RATIO=2.5
-MAX_OPEN_TRADES=3 | TRADING_WINDOWS= (sin filtro) | Perfil: base
-Resultado: +86% | 38% WR | PF 1.41 | DD 21.6% | 234 trades
-```
+| Config | Ret | WR | PF | DD | Ret/DD | Trades |
+|---|---|---|---|---|---|---|
+| 15m/ob_bos/w:13-16/RR 1.5 | **+51%** | 69% | 2.78 | 5.1% | **10.1x** | 71 |
+| 15m/base/w:11-18/RR 2.5 | +101% | 39% | 1.36 | 20.2% | 5.0x | 312 |
+| 15m/ob_bos/w:13-16/RR 2.5 | +48% | 50% | 2.11 | 9.4% | 5.1x | 66 |
 
 ## 🤖 Multi-Bot
 
-El bot soporta múltiples instancias corriendo en paralelo, cada una con su propia configuración:
-
-- **Bot 1** → lee `.env` (default)
-- **Bot 2** → lee `.env2`
-- **Bot N** → lee `.envN`
-
-Cada bot tiene su propio capital asignado (`BOT_CAPITAL`), journal de trades, archivo de log, y tag en Telegram. Comparten la misma conexión Binance y el mismo código.
+| Bot | .env | Estrategia | Config |
+|---|---|---|---|
+| Bot 1 (conservador) | `.env` | ob_bos | 15m, MTF, w:13-16, RR 1.5 |
+| Bot 2 (agresivo) | `.env2` | base | 15m, no MTF, w:11-18, RR 2.5 |
+| Grid Bot (spot) | `.env3` | grid | Auto-range, N niveles |
 
 ```bash
-# Arrancar ambos bots
 docker compose up -d smc-bot smc-bot-2 watchtower
-
-# Ver logs de cada uno
-docker compose logs -f smc-bot
-docker compose logs -f smc-bot-2
-
-# Parar solo uno
-docker compose stop smc-bot-2
-
-# Parar todo
-docker compose down
+docker compose logs -f smc-bot        # logs bot 1
+docker compose logs -f smc-bot-2      # logs bot 2
+docker compose down                    # parar todo
 ```
 
 ## 🚀 Uso rápido
 
 ```bash
-# Backtest
+# Backtest simple
 python scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 360 \
   --strategy ob_bos --max-trades 3 --windows 13-16 --rr 1.5
 
-# Backtest sin filtro de horario (--windows "" desactiva sesión automáticamente)
-python scripts/run_backtest.py --symbol ETHUSDT --timeframe 1h --dias 360 \
-  --max-trades 3 --windows "" --rr 2.5
-
-# Optimización sistemática
-python scripts/run_systematic.py --symbol ETHUSDT --timeframe 15m --dias 360 \
-  --max-trades 3 --windows 13-16
+# Backtest interactivo (pregunta todo, corre combinaciones, genera Excel)
+python scripts/run_interactive.py
 
 # Comparar resultados
-python scripts/compare_results.py --sort pf --top 5
+python scripts/compare_results.py --sort pf --top 10 --excel resultados.xlsx
+python scripts/compare_results.py --from-file backtest/results/_run_XXX.txt
 
-# Bot en vivo (un solo bot)
+# Limpiar resultados malos
+python scripts/clean_results.py --max-dd 20 --min-pf 1.0 --dry-run
+
+# Grid bot backtest
+python scripts/run_grid.py --backtest --dias 180 --symbol ETHUSDT --count 15
+
+# Grid bot paper
+python scripts/run_grid.py
+
+# Bot live
 python scripts/run_bot.py --live
-
-# Bot 2 (lee .env2)
 python scripts/run_bot.py --live --bot-number 2
 ```
 
-## ⏰ Ventanas horarias
+## 📊 Estrategias
 
-| Ventana | Horario UTC | Resultado |
-|---|---|---|
-| `13-16` | Apertura NY | **Mejor: PF 2.78, DD 5%** |
-| `13-17` | NY extendido | Bueno: PF 2.64, DD 4.3% |
-| *(vacío)* | 24hs sin filtro | Más trades, más DD |
-| `8-11` | Apertura London | Malo: -10%, evitar |
+| Perfil | Descripción |
+|---|---|
+| `base` | Sin filtros. Acepta toda señal SMC con score ≥ 50 |
+| `ob_bos` | OB solo válido si precedido por BOS. Soporta `OB_MAX_AGE` |
+| `ema_filter` | EMA 50/200 + distancia + vela confirmación (desactivado por default) |
+| `ob_bos_ema` | Combina ob_bos + ema_filter |
 
 ## ⚙️ Variables clave del .env
 
 | Variable | Descripción | Ejemplo |
 |---|---|---|
-| `BOT_TAG` | Nombre del bot (aparece en Telegram) | `15m-conservador` |
-| `BOT_CAPITAL` | Capital asignado al bot (0 = balance real) | `500` |
-| `TESTNET` | `true` = testnet, `false` = dinero real | `true` |
+| `STRATEGY` | Perfil de estrategia | `ob_bos` |
+| `BOT_TAG` | Nombre en Telegram/logs | `15m-conservador` |
+| `BOT_CAPITAL` | Capital virtual (0 = balance real) | `1000` |
+| `TESTNET` | true = testnet, false = real | `true` |
 | `MTF_ENABLED` | Multi-timeframe on/off | `true` |
-| `TRADING_WINDOWS` | Ventanas horarias UTC (vacío = 24h) | `13-16` |
-| `FILTRO_SESION` | Filtrar por sesión London/NY | `true` |
+| `MTF_LTF` / `MTF_HTF` | Timeframes | `15m` / `1h` |
+| `TRADING_WINDOWS` | Ventanas horarias UTC | `13-16` |
+| `TP_RR_RATIO` | Risk:Reward | `1.5` |
+| `MAX_OPEN_TRADES` | Trades simultáneos | `3` |
+| `OB_MAX_AGE` | Edad máx del OB en velas | `25` |
 
 ## 📖 Documentación
 
+- `CONTEXT.md` — Contexto completo para iniciar nueva sesión de chat
+- `operations-guide.html` — Operación del VPS (SSH, Docker, Git, .env)
 - `setup-guide.html` — Instalación completa
-- `operations-guide.html` — Operación del VPS (multi-bot, Docker, SSH)
-- `backtesting-guide.html` — Todos los comandos de testing
+- `backtesting-guide.html` — Referencia de backtesting
 
 ## ⚠️ Disclaimer
 

@@ -1,115 +1,217 @@
 # SMC Futures Bot — Contexto del proyecto
-# Fecha: 2026-03-17
+# Fecha: 2026-03-18
 # Usar este archivo para dar contexto a una nueva sesión de chat.
 
 ## Repo y acceso
 - GitHub: https://github.com/gabrielchiaradia/botSMC (privado)
 - VPS: Vultr, IP 167.179.114.168
 - SSH: `ssh -i C:\Users\Gabriel\.ssh\id_ed25519 root@167.179.114.168` luego `su - botuser`
-- Dashboard: http://167.179.114.168:8080
-- El bot corre en Docker como `smc-bot` con `docker compose`
-- El dashboard corre como container nginx separado (`smc-dashboard`)
+- Dashboard: http://167.179.114.168:8080 (nginx, auth con .htpasswd)
+- Working dir local: `C:\Users\Gabriel\Downloads\smc-bot-improved`
+- Working dir VPS: `~/smc-bot`
 
-## Estado actual del bot en producción
-- Corriendo en **LIVE testnet** con Binance Futures
-- Config: ETH/USDT, 15m LTF, 1h HTF, perfil ob_bos, RR 1:1.5, 3 trades max, ventana 13-16 UTC
+## Estructura del proyecto
+```
+smc-bot-improved/
+├── config/
+│   ├── __init__.py          # Exporta settings, creds, exchange, strategy, etc.
+│   └── settings.py          # Todo configurable desde .env. BOT_NUMBER, BOT_TAG,
+│                             # StrategyConfig (STRATEGY, SCORE_MINIMO, TRADING_WINDOWS),
+│                             # RiskConfig (BOT_CAPITAL, TP_RR_RATIO, MAX_OPEN_TRADES),
+│                             # ExchangeConfig, MTFConfig, etc.
+│
+├── strategy/
+│   ├── __init__.py           # Exporta analizar_mercado()
+│   ├── smc_signals.py        # Core SMC: detecta FVG, Order Blocks, BOS/CHoCH.
+│   │                         # Scoring 0-100. Score ≥ 50 = señal válida.
+│   ├── indicators.py         # ATR, swing highs/lows, sesiones, ventanas horarias,
+│   │                         # calcular_atr(), detectar_swings()
+│   ├── mtf_analysis.py       # Multi-timeframe: LTF señal + HTF contexto
+│   ├── risk.py               # Cálculo de tamaño, resumen de riesgo
+│   └── profiles/
+│       ├── __init__.py       # get_profile(), listar_perfiles(), PERFILES dict
+│       ├── base_profile.py   # BaseProfile, FilterContext, FilterResult (clases base)
+│       ├── profile_base.py   # ProfileBase — sin filtros, acepta toda señal ≥ score
+│       ├── profile_ob_bos.py # ProfileObBos — OB validado por BOS previo.
+│       │                     # OB_MAX_AGE: descarta OBs > N velas (env var)
+│       ├── profile_ema_filter.py  # EMA 50/200 + distancia + confirmación vela
+│       │                          # (filtros desactivados por default, necesitan env vars)
+│       └── (ob_bos_ema en profile_ema_filter.py)  # Combo OB+BOS + EMA
+│
+├── backtest/
+│   ├── __init__.py
+│   ├── engine.py             # Motor barra-a-barra. Multi-posición (hasta N trades),
+│   │                         # trailing dinámico (none/escalones/atr/hibrido),
+│   │                         # riesgo adaptativo, cooldown post-SL, perfil de filtro,
+│   │                         # exporta JSON con equity curve + trades.
+│   │                         # pnl_pct calculado sobre capital_antes (no inicial).
+│   └── results/              # JSONs de backtest (en .gitignore)
+│       └── .gitkeep
+│
+├── scripts/
+│   ├── run_bot.py            # Bot en tiempo real. WebSocket para LTF+HTF.
+│   │                         # Paper y live mode. STRATEGY configurable desde .env.
+│   │                         # Aplica perfil (ob_bos, etc.) a cada señal.
+│   │                         # Multi-bot: --bot-number N lee .envN.
+│   │                         # Soporta BOT_CAPITAL virtual.
+│   │
+│   ├── run_backtest.py       # CLI completo: --symbol, --timeframe, --dias, --strategy,
+│   │                         # --trailing, --max-trades, --windows, --score, --rr,
+│   │                         # --ob-max-age, --compare, --compare-trailing.
+│   │
+│   ├── run_systematic.py     # Optimización 5 fases: par+tf, perfil+trailing,
+│   │                         # score+ATR, RR ratio, trailing final.
+│   │
+│   ├── run_interactive.py    # Backtest interactivo: pregunta todas las opciones,
+│   │                         # permite múltiples valores por campo (productos cartesianos).
+│   │                         # Genera manifest .txt + Excel .xlsx al finalizar.
+│   │                         # Llama a compare_results.py con --from-file.
+│   │
+│   ├── run_grid.py           # Grid Bot Spot. Paper/live/backtest modes.
+│   │                         # Auto-range (P5-P95 en backtest, ±15% en live).
+│   │                         # Protecciones: stop loss, max loss USD, reposición.
+│   │                         # Lee .env3 (bot-number 3 por default).
+│   │
+│   ├── compare_results.py    # Compara JSONs: tabla con Symbol, TF, Strategy, Windows,
+│   │                         # Ret, Trades, WR, PF, DD. --sort por cualquier columna.
+│   │                         # --from-file (lee manifest), --excel, --csv.
+│   │
+│   └── clean_results.py      # Elimina backtests por condiciones: --max-dd, --min-wr,
+│                              # --min-ret, --min-pf, --min-trades. OR logic, --dry-run.
+│
+├── bot/
+│   ├── __init__.py
+│   └── websocket_stream.py   # MTFStream: WebSocket Binance para LTF + HTF.
+│
+├── data/
+│   ├── __init__.py
+│   └── fetcher.py            # obtener_velas(), obtener_historico_backtest(),
+│                              # crear_cliente_futures(). Descarga de Binance.
+│
+├── utils/
+│   ├── logger.py             # get_logger() con archivo rotativo y consola.
+│   ├── telegram_notify.py    # TelegramNotifier: inicio, señal, trade, error, resumen.
+│   │                         # Prefija todo con [BOT_TAG]. Fallback text si Markdown falla.
+│   └── trade_journal.py      # TradeJournal: multi-posición, registro de señales,
+│                              # exporta open_positions.json, per-bot filenames.
+│
+├── dashboard/
+│   ├── index.html            # Dashboard live: tema dark/light, WebSocket PnL en tiempo real,
+│   │                         # posiciones abiertas, sortable tables, log links header,
+│   │                         # carga local + servidor, comparación systematic.
+│   │                         # Trades limit: 500.
+│   └── nginx.conf            # Config nginx con auth y autoindex para logs/backtest.
+│
+├── backtest_dashboard.html   # Dashboard backtest local: carga JSON, tema dark/light,
+│                              # equity curve, PnL dist, hora/mes/sesión charts,
+│                              # tabla de trades sortable, botón volver, duration legible,
+│                              # nombre archivo visible.
+│
+├── deploy/
+│   ├── setup_vps.sh          # Setup inicial VPS (Docker, botuser, firewall)
+│   ├── setup_dashboard.sh    # Setup nginx dashboard con auth
+│   ├── update.sh             # Script de actualización
+│   └── monitor.sh            # Monitoreo del bot
+│
+├── docker-compose.yml        # smc-bot (.env), smc-bot-2 (.env2), smc-grid (.env3, comentado),
+│                              # watchtower, dashboard nginx.
+├── Dockerfile                # Python 3.11, pip install, corre run_bot.py --live
+├── requirements.txt
+├── .env3.example             # Template para grid bot
+├── .gitignore                # .env[0-9]* ignorado, !.env*.example permitido
+│
+├── operations-guide.html     # Guía de operaciones VPS (SSH, Docker, Git, .env)
+├── setup-guide.html          # Guía de instalación completa
+├── backtesting-guide.html    # Referencia de backtesting
+└── CONTEXT.md                # Este archivo
+```
+
+## Estado actual en producción
+- **2 bots corriendo** en LIVE testnet con Binance Futures
+- **Bot 1** (.env): ETH/15m, STRATEGY=ob_bos, MTF ON (LTF=15m, HTF=1h), ventana 13-16, RR 1.5, 3 max trades, $1000 capital
+- **Bot 2** (.env2): ETH/15m, STRATEGY=base, MTF OFF, ventana 11-18, RR 2.5, 3 max trades, $500 capital
+- **Grid bot** (.env3): implementado, no desplegado
 - Leverage 3x, 1% riesgo por trade
-- Notificaciones Telegram funcionando (hora local Argentina GMT-3)
-- Balance testnet: $5,000 USDT
+- fail2ban activo (SSH 3 retries, nginx 10 retries)
 
-## Arquitectura del bot
-- **strategy/smc_signals.py**: Detecta FVG, Order Blocks, BOS/CHoCH. Evalúa señal con scoring (0-100). Score ≥ 50 = señal válida.
-- **strategy/indicators.py**: ATR, swing highs/lows, sesiones de trading, ventanas horarias.
-- **strategy/profiles/**: Filtros adicionales. `ob_bos` es el recomendado (solo OBs con BOS previo).
-- **backtest/engine.py**: Motor barra-a-barra. Soporta multi-posición (hasta N trades), trailing dinámico (4 modos), riesgo adaptativo (reduce trades tras racha SL), cooldown post-SL, límite pérdida diaria.
-- **scripts/run_bot.py**: Bot en tiempo real. WebSocket para ambos TF. Soporta paper y live. Filtro de ventana horaria con alerta Telegram fuera de horario.
-- **scripts/run_backtest.py**: CLI completo con --symbol, --timeframe, --dias, --strategy, --trailing, --max-trades, --windows, --score, --rr, --compare, --compare-trailing.
-- **scripts/run_systematic.py**: Optimización en 5 fases (par+tf, perfil+trailing, score+ATR, RR ratio, trailing final). Soporta --symbol, --timeframe para saltar fase 1, y --windows.
-- **scripts/compare_results.py**: Compara múltiples JSONs de backtest. Muestra tabla con RR, días, retorno, trades, WR, PF, DD. Soporta --sort, --top, --min-trades, --csv.
-- **utils/trade_journal.py**: Multi-posición, racha SL adaptativa, registro de señales.
-- **utils/telegram_notify.py**: Notificaciones de inicio, señal, trade abierto/cerrado, fuera de horario.
-- **config/settings.py**: Todo configurable desde .env. TRADING_WINDOWS parseado como lista de tuplas.
+## Estrategias (perfiles)
+| Perfil | Descripción | Filtros |
+|---|---|---|
+| base | Sin filtros adicionales | Score ≥ 50 solamente |
+| ob_bos | OB validado por BOS | OB requiere BOS previo en 30 velas. OB_MAX_AGE configurable |
+| ema_filter | EMA 50/200 | Desactivado por default. Necesita EMA_FILTER_ENABLED=true |
+| ob_bos_ema | ob_bos + ema_filter | Combina ambos |
 
-## Configuración .env recomendada
+## Resultados backtesting (360 días, ETHUSDT)
+
+### Top configs validadas
+| Config | Ret | WR | PF | DD | Ret/DD | Trades |
+|---|---|---|---|---|---|---|
+| 15m/ob_bos/13-16/RR 1.5 | +51% | 69% | 2.78 | 5.1% | 10.1x | 71 |
+| 15m/base/11-18/RR 2.5 | +101% | 39% | 1.36 | 20.2% | 5.0x | 312 |
+| 15m/ob_bos/11-18/RR 2.5 | +45% | 40% | 1.41 | 23.1% | 1.9x | 142 |
+
+### Patrones confirmados
+- 15m > 1h en eficiencia (Ret/DD)
+- ob_bos siempre supera a base en mismo par/TF/ventana
+- Ventana 13-16 (apertura NY) es la mejor
+- ETH domina, otros pares mucho peores
+- 24h sin filtro → alto DD en todos los pares
+
+## Deploy commands
+```bash
+# Desde Windows
+cd C:\Users\Gabriel\Downloads\smc-bot-improved
+git add . && git commit -m "message" && git push
+
+# En VPS
+su - botuser && cd ~/smc-bot && git pull
+
+# Rebuild (cambios de código)
+docker compose down
+docker compose build --no-cache smc-bot
+docker compose up -d smc-bot smc-bot-2 watchtower
+docker builder prune -af
+
+# Solo .env changes (force recreate)
+docker compose down && docker compose up -d smc-bot smc-bot-2 watchtower
+
+# Dashboard (cambios HTML)
+docker restart smc-dashboard
+
+# Logs
+docker logs smc-bot --tail 20
+docker logs smc-bot-2 --tail 20
+docker exec smc-bot-2 env | grep VARIABLE
 ```
-SYMBOL=ETHUSDT
-TIMEFRAME=15m
-LEVERAGE=3
-RISK_PER_TRADE=0.01
-TP_RR_RATIO=1.5
-ATR_MULTIPLIER=1.5
-MAX_OPEN_TRADES=3
-MAX_DAILY_LOSS=0.03
-SCORE_MINIMO=50
-FILTRO_SESION=true
-SESIONES_ACTIVAS=london,new_york
-TRADING_WINDOWS=13-16
-TESTNET=true
-MTF_ENABLED=true
-MTF_HTF=1h
-MTF_LTF=15m
-WS_ENABLED=true
-TZ=America/Argentina/Buenos_Aires
-TELEGRAM_TOKEN=configurado
-TELEGRAM_CHAT_ID=configurado
-```
 
-## Resultados de backtesting clave
-### Config ganadora: ETH/15m, ob_bos, mt3, ventana 13-16, RR 1:1.5 (360 días)
-- Retorno: +51.09%
-- Win Rate: 69%
-- Profit Factor: 2.78
-- Max Drawdown: 5.1%
-- 71 trades
-- Señales filtradas: 797 (694 fuera de horario, 103 OB sin BOS)
+## Variables .env clave
+| Variable | Descripción | Ejemplo |
+|---|---|---|
+| STRATEGY | Perfil (base, ob_bos) | ob_bos |
+| BOT_TAG | Nombre en Telegram/logs | 15m-conservador |
+| BOT_CAPITAL | Capital virtual (0=real) | 1000 |
+| TESTNET | true=testnet, false=real | true |
+| MTF_ENABLED | Multi-timeframe | true |
+| MTF_LTF / MTF_HTF | Timeframes | 15m / 1h |
+| TRADING_WINDOWS | Ventanas UTC | 13-16 |
+| TP_RR_RATIO | Risk:Reward | 1.5 |
+| MAX_OPEN_TRADES | Trades simultáneos | 3 |
+| RISK_PER_TRADE | % capital por trade | 0.01 |
+| OB_MAX_AGE | Edad máx OB en velas | 25 |
 
-### Comparación de RR (360 días, ob_bos, mt3, w13-16)
-| RR  | Ret     | WR   | PF   | DD    |
-|-----|---------|------|------|-------|
-| 1.5 | +51.1%  | 69%  | 2.78 | 5.1%  |
-| 2.0 | +38.8%  | 54%  | 2.00 | 7.8%  |
-| 2.5 | +47.8%  | 50%  | 2.11 | 9.4%  |
-| 3.0 | +57.6%  | 47%  | 2.30 | 12.1% |
+## Notas técnicas importantes
+- `.env` NO se sube a Git. Editar en VPS: `nano ~/smc-bot/.env`
+- No poner comentarios inline en .env (Docker no los stripea)
+- `docker compose restart` no siempre recarga env_file. Usar `down` + `up`.
+- El backtest descarga datos frescos cada vez (no cache)
+- pnl_pct se calcula sobre capital al momento del trade (no inicial)
+- Señales fuera de ventana se evalúan pero no se operan (se notifican)
+- Python 3.12 recomendado para backtests (3.14 tiene issues con pandas)
 
-### Comparación de ventanas (180 días, ob_bos, mt3)
-| Ventana   | Ret     | WR   | PF   | DD    |
-|-----------|---------|------|------|-------|
-| 13-16     | +36.3%  | 66%  | 3.10 | 3.2%  |
-| 13-17     | +43.9%  | 62%  | 2.64 | 4.3%  |
-| 13-18     | +38.5%  | 55%  | 2.06 | 5.4%  |
-| 8-11      | -10.8%  | 22%  | 0.45 | 10.8% |
-
-### ETH/1h vs ETH/15m (360 días, mejor config)
-| TF  | Ret     | WR   | PF   | DD    | Trades |
-|-----|---------|------|------|-------|--------|
-| 15m | +51.1%  | 69%  | 2.78 | 5.1%  | 71     |
-| 1h  | +43.8%  | 37%  | 1.68 | 10.9% | 86     |
-
-## Bugs conocidos resueltos
-- `.loc[idx]` con DatetimeIndex duplicados → cambiado a `.iloc` en todos lados
-- `on_senal` vs `on_señal` typo en run_bot.py → corregido
-- Dashboard VPS: filtros Wins/Losses sobreescribían allTrades → separado en _originalTrades
-- Dockerfile multi-stage: dependencias no accesibles por usuario botuser → simplificado a single-stage
-- nginx.conf: regex roto → reemplazado con config simple
-
-## Features pendientes / ideas futuras
-1. **Trailing multi-timeframe**: Chequear trailing en TF menor al del trade (ej: trail en 5m para trades de 15m)
-2. **Sesiones como parámetro del systematic**: Probar combinaciones de ventanas automáticamente
-3. **Cloudflare Pages**: Subir dashboard a URL pública
-4. **Walk-forward optimization**: Después de 30 días de paper trading
-5. **Trailing en vivo**: Gestión dinámica de órdenes SL en Binance (cancelar y recrear)
-
-## Estructura de archivos de documentación
-- `setup-guide.html` — Guía de instalación (GitHub → VPS → Docker)
-- `operations-guide.html` — Operación diaria del VPS (SSH, Docker, Git, .env)
-- `backtesting-guide.html` — Referencia completa CLI + plan de pruebas
-- `README.md` — Overview del proyecto
-
-## Notas técnicas
-- Los datos de Binance se descargan frescos cada vez (no cache entre corridas de backtest)
-- El backtest usa `datetime.now()` (no UTC) para logs y Telegram, con TZ del .env
-- El engine de backtest soporta hasta N trades simultáneos con pyramiding (misma dirección)
-- Riesgo adaptativo: después de 3 SL consecutivos reduce a 1 trade, se restaura con WIN
-- Las señales fuera de ventana horaria se evalúan completas (con niveles) pero se marcan como fuera_de_horario
-- En el bot live, fuera de horario se notifica por Telegram pero no se opera
-- El dashboard del VPS se corre como container nginx separado (no en docker-compose por bug de read-only filesystem)
+## Features pendientes
+1. Walk-forward optimization
+2. Trailing en vivo (gestión dinámica SL en Binance)
+3. Grid bot testing y despliegue en VPS
+4. Telegram /status command interactivo
+5. OB_MAX_AGE testing con valores 15, 20, 25, 30
