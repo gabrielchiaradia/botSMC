@@ -4,7 +4,6 @@
 
 # ── CREDENCIALES — NUNCA COMMITEAR ───────────
 .env
-.env*
 *.env
 .env.local
 .env.*.local

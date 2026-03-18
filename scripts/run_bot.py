@@ -34,7 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from datetime import datetime
 
 from config import creds, exchange as excfg, mtf as mcfg, ws as wscfg, BOT_TAG, BOT_NUMBER
-from config.settings import logs as lcfg
+from config.settings import logs as lcfg, strategy as scfg
 from data import (
     crear_cliente_futures,
     obtener_velas,
@@ -151,7 +151,7 @@ def simular_cierre_paper(df, journal, balance):
 #  LOGICA CENTRAL DE ANALISIS
 # ══════════════════════════════════════════════════════════
 def procesar_velas(df_ltf, df_htf, client, modo_live,
-                   journal, notifier, balance_ref):
+                   journal, notifier, balance_ref, perfil=None):
     """
     Llamado por WebSocket (al cierre de vela) o por el loop de polling.
     Soporta múltiples trades simultáneos.
@@ -205,6 +205,29 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
         logger.info("Sin senal. %s", " | ".join(senal.motivos) or "ninguno")
         journal.registrar_señal(senal, balance, "SIN_SEÑAL")
         return
+
+    # Filtro de perfil (ob_bos, ema_filter, etc.)
+    if perfil is not None:
+        from strategy.profiles.base_profile import FilterContext
+        from strategy.indicators import detectar_swings, calcular_atr
+        swings = detectar_swings(df_ltf)
+        atr = calcular_atr(df_ltf)
+        ctx = FilterContext(
+            df      = df_ltf,
+            idx     = len(df_ltf) - 1,
+            señal   = senal,
+            swings  = swings,
+            atr     = atr,
+            precio  = df_ltf["close"].iloc[-1],
+        )
+        pasa, motivos_filtro = perfil.apply(ctx)
+        if not pasa:
+            motivo = motivos_filtro[-1] if motivos_filtro else "Perfil"
+            logger.info("Señal filtrada por perfil '%s': %s", perfil.nombre, motivo)
+            journal.registrar_señal(senal, balance, f"FILTRO_{perfil.nombre.upper()}")
+            return
+        # Agregar motivos del perfil a la señal
+        senal.motivos.extend(m for m in motivos_filtro if m and m not in senal.motivos)
 
     # Filtro ventana horaria: señal válida pero fuera de horario
     if senal.fuera_de_horario:
@@ -338,9 +361,22 @@ def main():
     print(f"  Max trades: {rcfg.MAX_OPEN_TRADES}")
     print(f"  RR:         1:{rcfg.TP_RR_RATIO}")
     print(f"  Riesgo:     {rcfg.RISK_PER_TRADE*100:.1f}% por trade")
+    print(f"  Estrategia: {scfg.STRATEGY}")
     if rcfg.BOT_CAPITAL > 0:
         print(f"  Capital:    ${rcfg.BOT_CAPITAL:,.0f} USDT (asignado)")
     print(f"{'='*60}\n")
+
+    # ── Cargar perfil de estrategia ───────────────────────
+    perfil = None
+    if scfg.STRATEGY != "base":
+        try:
+            from strategy.profiles import get_profile
+            perfil = get_profile(scfg.STRATEGY)
+            logger.info("[%s] Perfil cargado: %s — %s",
+                        BOT_TAG, perfil.nombre, perfil.descripcion)
+        except Exception as e:
+            logger.warning("No se pudo cargar perfil '%s': %s. Usando base.",
+                           scfg.STRATEGY, e)
 
     # ── Conectar exchange ─────────────────────────────────
     client = None
@@ -390,7 +426,7 @@ def main():
         if usar_ws:
             def on_señal(df_ltf, df_htf):
                 procesar_velas(df_ltf, df_htf, client, args.live,
-                               journal, notifier, balance_ref)
+                               journal, notifier, balance_ref, perfil)
 
             stream = MTFStream(
                 symbol     = excfg.SYMBOL,
@@ -420,7 +456,7 @@ def main():
                     df_htf = obtener_velas(client, excfg.SYMBOL, mcfg.HTF,
                                            limit=mcfg.HTF_CANDLES)
                     procesar_velas(df_ltf, df_htf, client, args.live,
-                                   journal, notifier, balance_ref)
+                                   journal, notifier, balance_ref, perfil)
                 except Exception as e:
                     logger.error("Error en ciclo %d: %s", ciclo_n, e, exc_info=True)
                     notifier.error_critico(str(e))

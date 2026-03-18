@@ -76,6 +76,7 @@ class RiskConfig:
 # ══════════════════════════════════════════════════════════
 class StrategyConfig:
     SCORE_MINIMO:      int   = int(os.getenv("SCORE_MINIMO", "50"))
+    STRATEGY:          str   = os.getenv("STRATEGY", "base")  # base, ob_bos, ema_filter, ob_bos_ema
     SWING_LENGTH:      int   = int(os.getenv("SWING_LENGTH", "5"))
     FVG_LOOKBACK:      int   = int(os.getenv("FVG_LOOKBACK", "30"))
     OB_LOOKBACK:       int   = int(os.getenv("OB_LOOKBACK", "30"))
