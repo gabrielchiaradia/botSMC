@@ -1,0 +1,33 @@
+# ══════════════════════════════════════════════════════
+#  SMC BOT 3 — Grid Bot Spot
+#  Copia a .env3 y completá tus valores.
+# ══════════════════════════════════════════════════════
+
+# Binance API (mismas keys que los otros bots)
+BINANCE_API_KEY=tu_key
+BINANCE_API_SECRET=tu_secret
+TESTNET=true
+
+# Identificación
+BOT_TAG=grid-eth
+
+# Grid Config
+GRID_SYMBOL=ETHUSDT
+GRID_UPPER=2200
+GRID_LOWER=1800
+GRID_COUNT=10
+GRID_CAPITAL=200
+GRID_CHECK_INTERVAL=30
+
+# Protecciones
+GRID_STOP_LOSS_PCT=5
+GRID_REPOSITION=true
+GRID_MAX_LOSS_USD=50
+
+# Telegram (mismo chat que los otros bots)
+TELEGRAM_TOKEN=tu_token
+TELEGRAM_CHAT_ID=tu_chat_id
+
+# Logging
+LOG_LEVEL=INFO
+TZ=America/Argentina/Buenos_Aires

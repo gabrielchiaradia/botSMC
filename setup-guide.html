@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SMC Bot — Guía de Configuración</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink:     #0f0f0f;
+  --paper:   #f5f2eb;
+  --cream:   #ede9df;
+  --rule:    #d4cfc4;
+  --accent:  #c1440e;
+  --accent2: #1a5c3a;
+  --code-bg: #1c1c1c;
+  --code-fg: #e8e0d0;
+  --warn:    #8b5e00;
+  --warn-bg: #fdf6e3;
+  --ok:      #1a5c3a;
+  --ok-bg:   #edf7f1;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  line-height: 1.8;
+  min-height: 100vh;
+}
+
+/* ── RUIDO DE PAPEL ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none; z-index: 0; opacity: 0.4;
+}
+
+/* ── LAYOUT ── */
+.page { max-width: 860px; margin: 0 auto; padding: 0 32px 80px; position: relative; z-index: 1; }
+
+/* ── PORTADA ── */
+.cover {
+  border-bottom: 3px double var(--rule);
+  padding: 60px 0 40px;
+  margin-bottom: 48px;
+}
+.cover-tag {
+  font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 16px;
+}
+.cover h1 {
+  font-family: 'DM Serif Display', serif;
+  font-size: clamp(32px, 5vw, 52px);
+  line-height: 1.1;
+  color: var(--ink);
+  margin-bottom: 12px;
+}
+.cover h1 em { color: var(--accent); font-style: italic; }
+.cover-sub {
+  color: #5a5449; font-size: 12px; margin-bottom: 28px;
+}
+.cover-meta {
+  display: flex; gap: 24px; flex-wrap: wrap;
+  font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: #8a8070; padding-top: 20px; border-top: 1px solid var(--rule);
+}
+.cover-meta span::before { content: '◆ '; color: var(--accent); }
+
+/* ── INDICE ── */
+.toc {
+  background: var(--cream);
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--accent);
+  padding: 24px 28px;
+  margin-bottom: 48px;
+}
+.toc h2 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 16px; margin-bottom: 16px; color: var(--ink);
+}
+.toc ol { padding-left: 20px; }
+.toc li { margin-bottom: 6px; }
+.toc a {
+  color: var(--ink); text-decoration: none; font-size: 12px;
+  border-bottom: 1px dotted var(--rule); transition: color 0.2s;
+}
+.toc a:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ── SECCIONES ── */
+.section { margin-bottom: 56px; }
+
+.section-header {
+  display: flex; align-items: baseline; gap: 16px;
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 8px; margin-bottom: 28px;
+}
+.section-num {
+  font-family: 'DM Serif Display', serif;
+  font-size: 42px; color: var(--rule); line-height: 1;
+  flex-shrink: 0;
+}
+.section-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: 22px; color: var(--ink);
+}
+
+h3 {
+  font-family: 'DM Serif Display', serif;
+  font-size: 16px; margin: 28px 0 12px;
+  color: var(--ink);
+}
+h3::before { content: '§ '; color: var(--accent); font-style: italic; }
+
+p { margin-bottom: 12px; color: #2a2520; }
+
+/* ── CÓDIGO ── */
+pre {
+  background: var(--code-bg);
+  color: var(--code-fg);
+  border-radius: 4px;
+  padding: 20px 24px;
+  overflow-x: auto;
+  margin: 16px 0;
+  font-size: 12px;
+  line-height: 1.7;
+  position: relative;
+  border-left: 3px solid var(--accent);
+}
+pre .comment { color: #6a6055; }
+pre .key     { color: #d4936e; }
+pre .val     { color: #9ec88a; }
+pre .cmd     { color: #7ab8f5; }
+pre .warn-c  { color: #f0c060; }
+
+code {
+  background: var(--cream); border: 1px solid var(--rule);
+  padding: 1px 5px; border-radius: 2px; font-size: 11px;
+  color: var(--accent);
+}
+pre code { background: none; border: none; padding: 0; color: inherit; font-size: inherit; }
+
+/* ── COPY BUTTON ── */
+.code-wrap { position: relative; }
+.copy-btn {
+  position: absolute; top: 10px; right: 10px;
+  background: #2e2e2e; border: 1px solid #444;
+  color: #aaa; font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; padding: 3px 8px; border-radius: 3px;
+  cursor: pointer; transition: all 0.2s; letter-spacing: 0.05em;
+}
+.copy-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.copy-btn.copied { background: var(--accent2); color: #fff; border-color: var(--accent2); }
+
+/* ── ALERTAS ── */
+.alert {
+  padding: 14px 18px; border-radius: 2px;
+  margin: 16px 0; font-size: 12px; line-height: 1.6;
+  border-left: 4px solid;
+}
+.alert-warn { background: var(--warn-bg); border-color: var(--warn); color: var(--warn); }
+.alert-ok   { background: var(--ok-bg);   border-color: var(--ok);   color: var(--ok); }
+.alert-info { background: var(--cream);   border-color: var(--rule);  color: #5a5449; }
+.alert strong { display: block; margin-bottom: 4px; text-transform: uppercase; font-size: 10px; letter-spacing: 0.1em; }
+
+/* ── TABLA ── */
+table {
+  width: 100%; border-collapse: collapse;
+  margin: 16px 0; font-size: 11px;
+}
+th {
+  background: var(--ink); color: var(--paper);
+  padding: 8px 12px; text-align: left;
+  font-weight: 600; letter-spacing: 0.05em;
+  text-transform: uppercase; font-size: 10px;
+}
+td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+}
+tr:nth-child(even) td { background: var(--cream); }
+td code { font-size: 11px; }
+
+/* ── STEPS ── */
+.steps { counter-reset: step; }
+.step {
+  display: flex; gap: 20px; margin-bottom: 24px;
+  padding-bottom: 24px; border-bottom: 1px dashed var(--rule);
+}
+.step:last-child { border-bottom: none; }
+.step-num {
+  counter-increment: step;
+  width: 32px; height: 32px;
+  background: var(--ink); color: var(--paper);
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-family: 'DM Serif Display', serif; font-size: 16px;
+  flex-shrink: 0; margin-top: 2px;
+}
+.step-num::after { content: counter(step); }
+.step-body { flex: 1; }
+.step-body strong { display: block; margin-bottom: 6px; font-size: 13px; }
+
+/* ── BADGE ── */
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 2px;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; vertical-align: middle;
+}
+.badge-red    { background: #fde8e0; color: var(--accent); border: 1px solid #f4c4b4; }
+.badge-green  { background: var(--ok-bg); color: var(--ok); border: 1px solid #c0dfd0; }
+.badge-yellow { background: var(--warn-bg); color: var(--warn); border: 1px solid #edd080; }
+.badge-gray   { background: var(--cream); color: #5a5449; border: 1px solid var(--rule); }
+
+/* ── TIMELINE ── */
+.timeline { border-left: 2px solid var(--rule); padding-left: 28px; margin: 20px 0; }
+.tl-item { position: relative; margin-bottom: 20px; }
+.tl-item::before {
+  content: '';
+  position: absolute; left: -35px; top: 5px;
+  width: 12px; height: 12px;
+  border: 2px solid var(--ink); border-radius: 50%;
+  background: var(--paper);
+}
+.tl-item.done::before { background: var(--accent2); border-color: var(--accent2); }
+.tl-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #8a8070; }
+.tl-title { font-family: 'DM Serif Display', serif; font-size: 15px; margin: 2px 0 4px; }
+.tl-desc  { font-size: 12px; color: #5a5449; }
+
+/* ── FOOTER ── */
+footer {
+  border-top: 3px double var(--rule);
+  padding: 24px 0;
+  margin-top: 60px;
+  font-size: 10px; color: #8a8070;
+  display: flex; justify-content: space-between; align-items: center;
+  letter-spacing: 0.05em;
+}
+
+/* ── PRINT ── */
+@media print {
+  .copy-btn { display: none; }
+  pre { border: 1px solid #ccc; }
+  .page { padding: 0 16px; }
+}
+
+@media (max-width: 600px) {
+  .page { padding: 0 16px 60px; }
+  .cover h1 { font-size: 28px; }
+  .cover-meta { gap: 12px; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- PORTADA -->
+<div class="cover">
+  <div class="cover-tag">Documentación técnica · v4.0</div>
+  <h1>SMC Futures Bot<br><em>Guía de Configuración</em></h1>
+  <div class="cover-sub">Guía completa: GitHub → VPS → Docker → Dashboard → Producción</div>
+  <div class="cover-meta">
+    <span>Binance Futures</span>
+    <span>Ubuntu 22.04 LTS</span>
+    <span>Docker + Nginx</span>
+    <span>Cloudflare Pages</span>
+    <span>Telegram Alerts</span>
+  </div>
+</div>
+
+<!-- ÍNDICE -->
+<div class="toc">
+  <h2>Índice</h2>
+  <ol>
+    <li><a href="#s1">Requisitos previos</a></li>
+    <li><a href="#s2">Subir el proyecto a GitHub</a></li>
+    <li><a href="#s3">Crear el VPS en Vultr</a></li>
+    <li><a href="#s4">Setup automático del servidor</a></li>
+    <li><a href="#s5">Configurar credenciales (.env)</a></li>
+    <li><a href="#s6">Iniciar el bot con Docker</a></li>
+    <li><a href="#s7">Dashboard web (nginx + Cloudflare)</a></li>
+    <li><a href="#s8">Monitoreo automático (cron)</a></li>
+    <li><a href="#s9">Comandos del día a día</a></li>
+    <li><a href="#s10">Actualizar el código desde Git</a></li>
+    <li><a href="#s11">Pasar a dinero real</a></li>
+    <li><a href="#s12">Variables de entorno — referencia completa</a></li>
+    <li><a href="#s13">Perfiles de estrategia</a></li>
+    <li><a href="#s14">Trailing dinámico (TP/SL adaptativo)</a></li>
+    <li><a href="#s15">Mejoras v2 del motor de backtest</a></li>
+  </ol>
+</div>
+
+
+<!-- 1 -->
+<div class="section" id="s1">
+  <div class="section-header">
+    <span class="section-num">01</span>
+    <span class="section-title">Requisitos previos</span>
+  </div>
+
+  <p>Antes de empezar necesitás tener listo lo siguiente en tu máquina local:</p>
+
+  <table>
+    <tr><th>Herramienta</th><th>Para qué se usa</th><th>Cómo instalar</th></tr>
+    <tr><td><code>git</code></td><td>Subir el código a GitHub</td><td><a href="https://git-scm.com">git-scm.com</a></td></tr>
+    <tr><td><code>python 3.11+</code></td><td>Correr el bot localmente</td><td><a href="https://python.org">python.org</a></td></tr>
+    <tr><td>Cuenta GitHub</td><td>Hospedar el repositorio</td><td><a href="https://github.com">github.com</a></td></tr>
+    <tr><td>Cuenta Vultr</td><td>El VPS donde corre el bot</td><td><a href="https://vultr.com">vultr.com</a></td></tr>
+    <tr><td>Cuenta Binance</td><td>API keys para el exchange</td><td><a href="https://binance.com">binance.com</a></td></tr>
+    <tr><td>SSH key par</td><td>Acceso seguro al VPS</td><td>Ver paso 3</td></tr>
+  </table>
+
+  <div class="alert alert-info">
+    <strong>Opcional pero recomendado</strong>
+    Cuenta en Cloudflare (gratuita) para el dashboard público, y un bot de Telegram para las notificaciones.
+  </div>
+</div>
+
+
+<!-- 2 -->
+<div class="section" id="s2">
+  <div class="section-header">
+    <span class="section-num">02</span>
+    <span class="section-title">Subir el proyecto a GitHub</span>
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num"></div>
+      <div class="step-body">
+        <strong>Descomprimir el zip y entrar al directorio</strong>
+        <div class="code-wrap">
+          <pre><span class="cmd">unzip</span> smc-bot-dashboard.zip
+<span class="cmd">cd</span> smc-bot</pre>
+          <button class="copy-btn" onclick="copiar(this)">copiar</button>
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num"></div>
+      <div class="step-body">
+        <strong>Crear repositorio en GitHub</strong>
+        <p>Ir a <a href="https://github.com/new">github.com/new</a> → nombre: <code>smc-bot</code> → <strong>sin</strong> inicializar con README ni .gitignore → Create repository.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num"></div>
+      <div class="step-body">
+        <strong>Inicializar git y hacer el primer push</strong>
+        <div class="code-wrap">
+          <pre><span class="cmd">git</span> init
+<span class="cmd">git</span> branch -M main
+<span class="cmd">git</span> remote add origin https://github.com/<span class="key">TU_USUARIO</span>/smc-bot.git
+<span class="cmd">git</span> add .
+<span class="cmd">git</span> commit -m <span class="val">"feat: SMC bot Fases 1-4 completo"</span>
+<span class="cmd">git</span> push -u origin main</pre>
+          <button class="copy-btn" onclick="copiar(this)">copiar</button>
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num"></div>
+      <div class="step-body">
+        <strong>Verificar que no subiste credenciales</strong>
+        <div class="code-wrap">
+          <pre><span class="comment"># Debe devolver vacío. Si muestra algo, revisá antes de pushear.</span>
+<span class="cmd">git</span> log --oneline -1 | xargs git show | grep -i <span class="val">"api_key\|secret\|token"</span></pre>
+          <button class="copy-btn" onclick="copiar(this)">copiar</button>
+        </div>
+        <div class="alert alert-warn">
+          <strong>Importante</strong>
+          El archivo <code>.env</code> nunca debe aparecer en el repositorio. El <code>.gitignore</code> ya lo excluye, pero siempre es bueno verificar.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- 3 -->
+<div class="section" id="s3">
+  <div class="section-header">
+    <span class="section-num">03</span>
+    <span class="section-title">Crear el VPS en Vultr</span>
+  </div>
+
+  <p>Vultr Tokyo es la ubicación óptima porque los servidores de Binance Futures están en AWS Tokyo. La latencia desde Tokyo es ~0.6ms vs ~50ms desde Latinoamérica.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num"></div>
+      <div class="step-body">
+        <strong>Generar SSH key (si no tenés una)</strong>
+        <div class="code-wrap">
+          <pre><span class="cmd">ssh-keygen</span> -t ed25519 -C <span class="val">"smc-bot-vps"</span>
+<span class="comment"># Guardar en ~/.ssh/id_ed25519 (Enter para todo)</span>
+<span class="comment"># Ver la clave pública que vas a pegar en Vultr:</span>
+<span class="cmd">cat</span> ~/.ssh/id_ed25519.pub</pre>
+          <button class="copy-btn" onclick="copiar(this)">copiar</button>
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num"></div>
+      <div class="step-body">
+        <strong>Configurar el servidor en Vultr</strong>
+        <table>
+          <tr><th>Campo</th><th>Valor</th></tr>
+          <tr><td>Type</td><td>Cloud Compute — <strong>High Frequency</strong></td></tr>
+          <tr><td>Location</td><td>🇯🇵 <strong>Tokyo, Japan</strong></td></tr>
+          <tr><td>OS</td><td><strong>Ubuntu 22.04 LTS</strong> x64</td></tr>
+          <tr><td>Plan</td><td>1 vCPU / 1GB RAM / 32GB NVMe → <strong>~$6/mes</strong></td></tr>
+          <tr><td>SSH Keys</td><td>Pegar la clave pública del paso anterior</td></tr>
+          <tr><td>Hostname</td><td><code>smc-bot</code></td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num"></div>
+      <div class="step-body">
+        <strong>Conectarse cuando el servidor esté Running</strong>
+        <div class="code-wrap">
+          <pre><span class="cmd">ssh</span> root@<span class="key">TU_IP_VPS</span></pre>
+          <button class="copy-btn" onclick="copiar(this)">copiar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- 4 -->
+<div class="section" id="s4">
+  <div class="section-header">
+    <span class="section-num">04</span>
+    <span class="section-title">Setup automático del servidor</span>
+  </div>
+
+  <p>Un solo comando instala Docker, configura el firewall, crea el usuario <code>botuser</code>, clona el repositorio y habilita el servicio para que arranque al reboot.</p>
+
+  <div class="code-wrap">
+    <pre><span class="comment"># Ejecutar como root en el VPS</span>
+REPO_URL=https://github.com/<span class="key">TU_USUARIO</span>/smc-bot.git \
+  bash &lt;(curl -fsSL https://raw.githubusercontent.com/<span class="key">TU_USUARIO</span>/smc-bot/main/deploy/setup_vps.sh)</pre>
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+  </div>
+
+  <h3>Qué hace el script</h3>
+  <table>
+    <tr><th>Acción</th><th>Detalle</th></tr>
+    <tr><td>Actualizar sistema</td><td><code>apt update && apt upgrade</code></td></tr>
+    <tr><td>Crear usuario <code>botuser</code></td><td>Sin acceso root, solo puede usar Docker</td></tr>
+    <tr><td>Configurar firewall</td><td>Solo puerto 22 (SSH) abierto. Todo lo demás bloqueado.</td></tr>
+    <tr><td>Instalar fail2ban</td><td>Bloquea IPs que intenten fuerza bruta en SSH</td></tr>
+    <tr><td>Instalar Docker CE</td><td>Versión oficial, no la del apt por defecto</td></tr>
+    <tr><td>Clonar repositorio</td><td>En <code>/home/botuser/smc-bot</code></td></tr>
+    <tr><td>Crear <code>.env</code></td><td>Copiado desde <code>.env.example</code>, listo para completar</td></tr>
+    <tr><td>Servicio systemd</td><td><code>docker compose up</code> automático al reboot</td></tr>
+  </table>
+
+  <div class="alert alert-ok">
+    <strong>El SSH queda igual</strong>
+    El script abre explícitamente el puerto 22 antes de activar el firewall. No te quedás sin acceso.
+  </div>
+</div>
+
+
+<!-- 5 -->
+<div class="section" id="s5">
+  <div class="section-header">
+    <span class="section-num">05</span>
+    <span class="section-title">Configurar credenciales (.env)</span>
+  </div>
+
+  <div class="code-wrap">
+    <pre><span class="comment"># Conectarse como botuser</span>
+<span class="cmd">ssh</span> botuser@<span class="key">TU_IP_VPS</span>
+<span class="cmd">nano</span> ~/smc-bot/.env</pre>
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+  </div>
+
+  <h3>Mínimo para paper trading (Testnet)</h3>
+  <div class="code-wrap">
+    <pre><span class="comment"># API keys de testnet.binancefuture.com</span>
+<span class="key">BINANCE_API_KEY</span>=<span class="val">tu_key_testnet</span>
+<span class="key">BINANCE_API_SECRET</span>=<span class="val">tu_secret_testnet</span>
+<span class="key">TESTNET</span>=<span class="val">true</span>
+
+<span class="comment"># Notificaciones (obtener de @BotFather en Telegram)</span>
+<span class="key">TELEGRAM_TOKEN</span>=<span class="val">1234567890:AAxxxx</span>
+<span class="key">TELEGRAM_CHAT_ID</span>=<span class="val">tu_chat_id</span></pre>
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+  </div>
+
+  <h3>Cómo obtener las API keys de Binance Testnet</h3>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num"></div>
+      <div class="step-body">
+        <strong>Crear cuenta en el Testnet</strong>
+        <p>Ir a <a href="https://testnet.binancefuture.com">testnet.binancefuture.com</a> → registrarse con GitHub → ir a Settings → API Key → generar.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num"></div>
+      <div class="step-body">
+        <strong>Agregar la IP del VPS a la whitelist</strong>
+        <p>En la configuración de la API key en Binance, agregar la IP del VPS en "Restrict access to trusted IPs only". Sin este paso Binance rechazará las órdenes aunque la key sea correcta.</p>
+        <div class="code-wrap">
+          <pre><span class="comment"># Ver la IP pública del VPS desde el VPS:</span>
+<span class="cmd">curl</span> ifconfig.me</pre>
+          <button class="copy-btn" onclick="copiar(this)">copiar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Cómo obtener el Telegram Chat ID</h3>
+  <div class="code-wrap">
+    <pre><span class="comment"># 1. Crear bot en @BotFather → /newbot → copiar el TOKEN
+# 2. Enviar cualquier mensaje al bot
+# 3. Abrir esta URL en el navegador (reemplazar TOKEN):</span>
+https://api.telegram.org/bot<span class="key">TOKEN</span>/getUpdates
+<span class="comment"># 4. Buscar "chat":{"id": XXXXXXXX} → ese número es el CHAT_ID</span></pre>
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+  </div>
+</div>
+
+
+<!-- 6 -->
+<div class="section" id="s6">
+  <div class="section-header">
+    <span class="section-num">06</span>
+    <span class="section-title">Iniciar el bot con Docker</span>
+  </div>
+
+  <div class="code-wrap">
+    <pre><span class="cmd">cd</span> ~/smc-bot
+
+<span class="comment"># Build + arranque en background</span>
+<span class="cmd">docker</span> compose up -d --build
+
+<span class="comment"># Verificar que está corriendo</span>
+<span class="cmd">docker</span> compose ps
+
+<span class="comment"># Ver logs en tiempo real (Ctrl+C para salir sin detener)</span>
+<span class="cmd">docker</span> compose logs -f smc-bot</pre>
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+  </div>
+
+  <div class="alert alert-ok">
+    <strong>Qué esperar en los logs</strong>
+    Vas a ver líneas como: <code>Precio: $64000 | Tendencia: ALCISTA | Sesión: london | Score: 30/100</code> y <code>Sin señal. Mercado lateral</code>. Eso es normal — el bot analiza y loguea cada ciclo aunque no opere.
+  </div>
+
+  <h3>Modos de operación</h3>
+  <table>
+    <tr><th>Modo</th><th>Comando</th><th>Opera</th><th>Genera JSON</th></tr>
+    <tr>
+      <td><span class="badge badge-yellow">Paper</span></td>
+      <td><code>python scripts/run_bot.py</code></td>
+      <td>No</td><td>Sí</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-yellow">Paper + Polling</span></td>
+      <td><code>python scripts/run_bot.py --poll</code></td>
+      <td>No</td><td>Sí</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-green">Live Testnet</span></td>
+      <td><code>python scripts/run_bot.py --live</code></td>
+      <td>Testnet</td><td>Sí</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-red">Live Real</span></td>
+      <td><code>--live</code> + <code>TESTNET=false</code></td>
+      <td>Real ⚠️</td><td>Sí</td>
+    </tr>
+  </table>
+
+  <p>En Docker, el modo se configura en <code>docker-compose.yml</code> bajo <code>CMD</code>, o sobreescribiendo el comando:</p>
+  <div class="code-wrap">
+    <pre><span class="comment"># Paper trading (default)</span>
+<span class="cmd">docker</span> compose up -d smc-bot
+
+<span class="comment"># Live Testnet</span>
+<span class="cmd">docker</span> compose run -d smc-bot <span class="val">--live</span></pre>
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+  </div>
+</div>
+
+
+<!-- 7 -->
+<div class="section" id="s7">
+  <div class="section-header">
+    <span class="section-num">07</span>
+    <span class="section-title">Dashboard web</span>
+  </div>
+
+  <h3>Opción A — nginx en el VPS (recomendado para uso diario)</h3>
+  <p>Siempre actualizado. El bot escribe los JSONs y nginx los sirve al instante. El dashboard hace auto-refresh cada 60 segundos.</p>
+
+  <div class="code-wrap">
+    <pre><span class="comment"># Setup en un comando (pedirá usuario y contraseña)</span>
+<span class="cmd">bash</span> ~/smc-bot/deploy/setup_dashboard.sh
+
+<span class="comment"># Acceder desde el navegador:</span>
+http://<span class="key">TU_IP_VPS</span>:8080</pre>
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+  </div>
+
+  <h3>Opción B — Cloudflare Pages (URL pública .pages.dev)</h3>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num"></div>
+      <div class="step-body">
+        <strong>Crear el proyecto en Cloudflare</strong>
+        <p>Ir a <a href="https://dash.cloudflare.com">dash.cloudflare.com</a> → Pages → Create project → Direct Upload → nombre: <code>smc-bot</code> → subir cualquier HTML para activarlo.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num"></div>
+      <div class="step-body">
+        <strong>Obtener credenciales de Cloudflare</strong>
+        <table>
+          <tr><th>Variable</th><th>Dónde obtenerla</th></tr>
+          <tr><td><code>CF_API_TOKEN</code></td><td><a href="https://dash.cloudflare.com/profile/api-tokens">dash.cloudflare.com/profile/api-tokens</a> → Crear token → <em>Cloudflare Pages: Edit</em></td></tr>
+          <tr><td><code>CF_ACCOUNT_ID</code></td><td><a href="https://dash.cloudflare.com">dash.cloudflare.com</a> → barra lateral derecha → Account ID</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num"></div>
+      <div class="step-body">
+        <strong>Agregar al .env y subir</strong>
+        <div class="code-wrap">
+          <pre><span class="comment"># En .env del VPS:</span>
+<span class="key">CF_API_TOKEN</span>=<span class="val">tu_token</span>
+<span class="key">CF_ACCOUNT_ID</span>=<span class="val">tu_account_id</span>
+<span class="key">CF_PROJECT_NAME</span>=<span class="val">smc-bot</span>
+
+<span class="comment"># Subir manualmente:</span>
+<span class="cmd">bash</span> ~/smc-bot/deploy/cloudflare_upload.sh
+
+<span class="comment"># URL pública:</span>
+https://smc-bot.<span class="key">TU_USUARIO</span>.pages.dev</pre>
+          <button class="copy-btn" onclick="copiar(this)">copiar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- 8 -->
+<div class="section" id="s8">
+  <div class="section-header">
+    <span class="section-num">08</span>
+    <span class="section-title">Monitoreo automático (cron)</span>
+  </div>
+
+  <div class="code-wrap">
+    <pre><span class="cmd">crontab</span> -e
+<span class="comment"># Agregar estas líneas:</span></pre>
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+  </div>
+
+  <div class="code-wrap">
+    <pre><span class="comment"># Monitoreo cada 5 min: reinicia si cae + alerta Telegram</span>
+*/5 * * * * ~/smc-bot/deploy/monitor.sh >> ~/smc-bot/logs/monitor.log 2>&1
+
+<span class="comment"># Subir a Cloudflare Pages cada hora (si usás Opción B)</span>
+0 * * * * ~/smc-bot/deploy/cloudflare_upload.sh >> ~/smc-bot/logs/cf_upload.log 2>&1
+
+<span class="comment"># Git pull + restart todos los días a las 3am UTC</span>
+0 3 * * * ~/smc-bot/deploy/update.sh --no-build >> ~/smc-bot/logs/update.log 2>&1</pre>
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+  </div>
+
+  <h3>Qué hace monitor.sh</h3>
+  <table>
+    <tr><th>Evento</th><th>Acción</th></tr>
+    <tr><td>Contenedor corriendo normalmente</td><td>Log silencioso</td></tr>
+    <tr><td>Contenedor caído</td><td>Alerta Telegram + intento de reinicio automático</td></tr>
+    <tr><td>Fallo de reinicio</td><td>Segunda alerta pidiendo intervención manual</td></tr>
+    <tr><td>Contenedor se recupera</td><td>Alerta de "Bot recuperado"</td></tr>
+    <tr><td>Disco &gt; 85%</td><td>Alerta de disco lleno</td></tr>
+  </table>
+</div>
+
+
+<!-- 9 -->
+<div class="section" id="s9">
+  <div class="section-header">
+    <span class="section-num">09</span>
+    <span class="section-title">Comandos del día a día</span>
+  </div>
+
+  <div class="code-wrap">
+    <pre><span class="comment"># ── Logs ──────────────────────────────────────────────────</span>
+<span class="cmd">docker</span> compose logs -f smc-bot              <span class="comment"># Tiempo real</span>
+<span class="cmd">tail</span> -50 ~/smc-bot/logs/smc_bot.log         <span class="comment"># Últimas 50 líneas</span>
+<span class="cmd">cat</span> ~/smc-bot/logs/signals_$(date +%Y%m%d).json | python3 -m json.tool | head -60
+
+<span class="comment"># ── Estado del bot ────────────────────────────────────────</span>
+<span class="cmd">docker</span> compose ps                           <span class="comment"># Estado de contenedores</span>
+<span class="cmd">docker</span> stats smc-bot                        <span class="comment"># CPU y memoria en tiempo real</span>
+
+<span class="comment"># ── Control ───────────────────────────────────────────────</span>
+<span class="cmd">docker</span> compose restart smc-bot              <span class="comment"># Reiniciar</span>
+<span class="cmd">docker</span> compose down                         <span class="comment"># Detener todo</span>
+<span class="cmd">docker</span> compose up -d                        <span class="comment"># Arrancar todo</span>
+
+<span class="comment"># ── Dashboard ─────────────────────────────────────────────</span>
+<span class="comment"># Descargar JSON del día a tu PC local:</span>
+<span class="cmd">scp</span> botuser@<span class="key">TU_IP</span>:~/smc-bot/logs/dashboard_trades_$(date +%Y%m%d).json ./
+
+<span class="comment"># ── Disco ─────────────────────────────────────────────────</span>
+<span class="cmd">df</span> -h /                                     <span class="comment"># Espacio en disco</span>
+<span class="cmd">docker</span> system prune -f                      <span class="comment"># Limpiar imágenes viejas</span></pre>
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+  </div>
+</div>
+
+
+<!-- 10 -->
+<div class="section" id="s10">
+  <div class="section-header">
+    <span class="section-num">10</span>
+    <span class="section-title">Actualizar el código desde Git</span>
+  </div>
+
+  <p>Cada vez que hacés cambios en tu máquina y los subís a GitHub:</p>
+
+  <div class="code-wrap">
+    <pre><span class="comment"># En tu máquina local:</span>
+<span class="cmd">git</span> add .
+<span class="cmd">git</span> commit -m <span class="val">"fix: ajuste de parámetros"</span>
+<span class="cmd">git</span> push origin main
+
+<span class="comment"># En el VPS:</span>
+<span class="cmd">bash</span> ~/smc-bot/deploy/update.sh              <span class="comment"># Pull + rebuild + restart</span>
+<span class="cmd">bash</span> ~/smc-bot/deploy/update.sh --no-build   <span class="comment"># Solo pull + restart (sin rebuild)</span></pre>
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+  </div>
+
+  <div class="alert alert-info">
+    <strong>Cuándo usar --no-build</strong>
+    Si solo cambiaste parámetros en <code>.env</code>, lógica de estrategia, o scripts Python (sin tocar <code>requirements.txt</code>), el flag <code>--no-build</code> es más rápido porque no reinstala las dependencias.
+  </div>
+</div>
+
+
+<!-- 11 -->
+<div class="section" id="s11">
+  <div class="section-header">
+    <span class="section-num">11</span>
+    <span class="section-title">Pasar a dinero real</span>
+  </div>
+
+  <div class="timeline">
+    <div class="tl-item done">
+      <div class="tl-label">Semanas 1-2</div>
+      <div class="tl-title">Entorno funcionando</div>
+      <div class="tl-desc">VPS corriendo, bot en paper trading, logs fluyendo. Verificar que las señales tienen sentido mirando los gráficos.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-label">Semanas 3-6</div>
+      <div class="tl-title">Paper trading activo — 30 días mínimo</div>
+      <div class="tl-desc">No se puede acelerar. Observar win rate real vs backtest, sesiones donde funciona mejor, señales descartadas.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-label">Semanas 7-8</div>
+      <div class="tl-title">Análisis y ajuste de parámetros</div>
+      <div class="tl-desc">Revisar journal de señales. Ajustar uno o dos parámetros si algo no funciona. Correr backtest para confirmar.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-label">Semana 9</div>
+      <div class="tl-title">Live en Testnet con órdenes reales</div>
+      <div class="tl-desc">Cambiar a <code>--live</code> con <code>TESTNET=true</code>. Verificar que las órdenes, el SL y el TP se ejecutan correctamente.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-label">Semana 10+</div>
+      <div class="tl-title">Real con capital mínimo</div>
+      <div class="tl-desc">Cambiar <code>TESTNET=false</code>. Arrancar con $50-100 USDT y apalancamiento 2x máximo. Nunca arriesgar más del 1% por trade.</div>
+    </div>
+  </div>
+
+  <div class="alert alert-warn">
+    <strong>Para pasar a real</strong>
+    Cambiar en <code>.env</code>: <code>TESTNET=false</code> y <code>LEVERAGE=2</code>. Crear nuevas API keys en Binance.com real (no testnet) con la IP del VPS en la whitelist. Agregar fondos reales a la cuenta de Futuros.
+  </div>
+</div>
+
+
+<!-- 12 -->
+<div class="section" id="s12">
+  <div class="section-header">
+    <span class="section-num">12</span>
+    <span class="section-title">Variables de entorno — referencia</span>
+  </div>
+
+  <h3>Exchange</h3>
+  <table>
+    <tr><th>Variable</th><th>Default</th><th>Descripción</th></tr>
+    <tr><td><code>BINANCE_API_KEY</code></td><td>—</td><td>API Key de Binance <span class="badge badge-red">requerido</span></td></tr>
+    <tr><td><code>BINANCE_API_SECRET</code></td><td>—</td><td>API Secret de Binance <span class="badge badge-red">requerido</span></td></tr>
+    <tr><td><code>TESTNET</code></td><td><code>true</code></td><td><code>true</code> = dinero ficticio | <code>false</code> = real</td></tr>
+    <tr><td><code>SYMBOL</code></td><td><code>BTCUSDT</code></td><td>Par a operar</td></tr>
+    <tr><td><code>TIMEFRAME</code></td><td><code>15m</code></td><td>Temporalidad principal</td></tr>
+    <tr><td><code>LEVERAGE</code></td><td><code>2</code></td><td>Apalancamiento (máx 2 para empezar)</td></tr>
+  </table>
+
+  <h3>Gestión de riesgo</h3>
+  <table>
+    <tr><th>Variable</th><th>Default</th><th>Descripción</th></tr>
+    <tr><td><code>RISK_PER_TRADE</code></td><td><code>0.01</code></td><td>% del capital por operación (1%)</td></tr>
+    <tr><td><code>TP_RR_RATIO</code></td><td><code>2.0</code></td><td>Ratio riesgo:recompensa (1:2)</td></tr>
+    <tr><td><code>ATR_MULTIPLIER</code></td><td><code>1.5</code></td><td>Distancia del SL en múltiplos de ATR</td></tr>
+    <tr><td><code>MAX_DAILY_LOSS</code></td><td><code>0.03</code></td><td>Stop trading si pérdida diaria &gt; 3%</td></tr>
+  </table>
+
+  <h3>Estrategia SMC</h3>
+  <table>
+    <tr><th>Variable</th><th>Default</th><th>Descripción</th></tr>
+    <tr><td><code>SCORE_MINIMO</code></td><td><code>50</code></td><td>Score mínimo para abrir operación</td></tr>
+    <tr><td><code>SWING_LENGTH</code></td><td><code>5</code></td><td>Velas para detectar swing highs/lows</td></tr>
+    <tr><td><code>ATR_PERIOD</code></td><td><code>14</code></td><td>Período del ATR</td></tr>
+    <tr><td><code>FILTRO_SESION</code></td><td><code>true</code></td><td>Solo operar en sesiones activas</td></tr>
+    <tr><td><code>SESIONES_ACTIVAS</code></td><td><code>london,new_york</code></td><td>Sesiones habilitadas</td></tr>
+  </table>
+
+  <h3>Multi-timeframe</h3>
+  <table>
+    <tr><th>Variable</th><th>Default</th><th>Descripción</th></tr>
+    <tr><td><code>MTF_ENABLED</code></td><td><code>true</code></td><td>Activar análisis multi-timeframe</td></tr>
+    <tr><td><code>MTF_HTF</code></td><td><code>1h</code></td><td>Timeframe alto (contexto)</td></tr>
+    <tr><td><code>MTF_LTF</code></td><td><code>5m</code></td><td>Timeframe bajo (entrada)</td></tr>
+    <tr><td><code>MTF_BONUS_ALINEADO</code></td><td><code>20</code></td><td>Puntos extra si HTF y LTF alineados</td></tr>
+    <tr><td><code>MTF_PENALTI_OPUESTO</code></td><td><code>30</code></td><td>Puntos a restar si HTF opuesto</td></tr>
+  </table>
+
+  <h3>Notificaciones y dashboard</h3>
+  <table>
+    <tr><th>Variable</th><th>Default</th><th>Descripción</th></tr>
+    <tr><td><code>TELEGRAM_TOKEN</code></td><td>—</td><td>Token del bot de Telegram</td></tr>
+    <tr><td><code>TELEGRAM_CHAT_ID</code></td><td>—</td><td>Chat ID donde enviar alertas</td></tr>
+    <tr><td><code>CF_API_TOKEN</code></td><td>—</td><td>Token de Cloudflare Pages</td></tr>
+    <tr><td><code>CF_ACCOUNT_ID</code></td><td>—</td><td>Account ID de Cloudflare</td></tr>
+    <tr><td><code>CF_PROJECT_NAME</code></td><td><code>smc-bot</code></td><td>Nombre del proyecto en Pages</td></tr>
+    <tr><td><code>WS_ENABLED</code></td><td><code>true</code></td><td><code>false</code> = usar polling REST</td></tr>
+    <tr><td><code>LOG_LEVEL</code></td><td><code>INFO</code></td><td><code>DEBUG</code> / <code>INFO</code> / <code>WARNING</code></td></tr>
+  </table>
+</div>
+
+
+<!-- 13 -->
+<div class="section" id="s13">
+  <div class="section-header">
+    <span class="section-num">13</span>
+    <span class="section-title">Perfiles de estrategia</span>
+  </div>
+
+  <p>Los perfiles son capas de filtros adicionales que se aplican <strong>después</strong> de la señal SMC base. Permiten probar distintas combinaciones sin modificar el código core.</p>
+
+  <h3>Perfiles disponibles</h3>
+  <table>
+    <tr><th>Nombre</th><th>Qué hace</th></tr>
+    <tr><td><code>base</code></td><td>Estrategia SMC pura: FVG + OB + BOS. Sin filtros extra. Sirve como baseline.</td></tr>
+    <tr><td><code>ob_bos</code></td><td>Solo acepta Order Blocks que fueron precedidos por un BOS. Reduce cantidad pero mejora calidad.</td></tr>
+    <tr><td><code>ema_filter</code></td><td>Filtra con EMA 50/200 en HTF + distancia al precio + vela de confirmación (engulfing/martillo).</td></tr>
+    <tr><td><code>ob_bos_ema</code></td><td>Combina OB+BOS con los filtros EMA. El más restrictivo.</td></tr>
+  </table>
+
+  <h3>Uso en backtest</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="comment"># Un solo perfil</span>
+<span class="cmd">python</span> scripts/run_backtest.py --strategy ob_bos
+
+<span class="comment"># Comparar todos los perfiles</span>
+<span class="cmd">python</span> scripts/run_backtest.py --compare
+
+<span class="comment"># Comparar perfiles específicos</span>
+<span class="cmd">python</span> scripts/run_backtest.py --compare --profiles base ob_bos
+
+<span class="comment"># Listar perfiles disponibles</span>
+<span class="cmd">python</span> scripts/run_backtest.py --list-profiles</pre>
+  </div>
+
+  <h3>Crear un perfil nuevo</h3>
+  <ol>
+    <li>Crear <code>strategy/profiles/profile_mi_perfil.py</code></li>
+    <li>Heredar de <code>BaseProfile</code> e implementar <code>nombre</code>, <code>descripcion</code> y <code>filtros()</code></li>
+    <li>Registrarlo en <code>strategy/profiles/__init__.py</code></li>
+    <li>Listo — el backtest y el bot lo reconocen automáticamente</li>
+  </ol>
+</div>
+
+
+<!-- 14 -->
+<div class="section" id="s14">
+  <div class="section-header">
+    <span class="section-num">14</span>
+    <span class="section-title">Trailing dinámico (TP/SL adaptativo)</span>
+  </div>
+
+  <p>En lugar de un TP fijo en 2R, el sistema puede mover el SL y el TP dinámicamente a medida que el precio avanza a favor. Hay <strong>4 modos</strong> disponibles:</p>
+
+  <h3>Modos de trailing</h3>
+  <table>
+    <tr><th>Modo</th><th>Cómo funciona</th><th>Ideal para</th></tr>
+    <tr>
+      <td><code>none</code></td>
+      <td>TP y SL fijos. Comportamiento original (RR 1:2 estático).</td>
+      <td>Baseline, mercados laterales</td>
+    </tr>
+    <tr>
+      <td><code>escalones</code></td>
+      <td>Cada vez que el precio avanza 1R a favor, el SL sube 1R. No hay TP fijo: el trade corre hasta que el trailing SL lo cierre. Puede capturar 3R, 4R, 5R+.</td>
+      <td>Tendencias fuertes</td>
+    </tr>
+    <tr>
+      <td><code>atr</code></td>
+      <td>El SL sigue al mejor precio a una distancia de N&times;ATR (default 2&times;ATR). Sin TP fijo. Se adapta a la volatilidad en tiempo real.</td>
+      <td>Movimientos explosivos con volatilidad variable</td>
+    </tr>
+    <tr>
+      <td><code>hibrido</code></td>
+      <td>Cierra 50% de la posición al TP original (2R), asegurando ganancia. El 50% restante corre con trailing por escalones sin límite. Mejor de ambos mundos.</td>
+      <td>Uso general recomendado</td>
+    </tr>
+  </table>
+
+  <h3>Ejemplo visual: modo escalones (LONG)</h3>
+  <div class="code-block">
+    <pre><span class="comment">Entrada $100, SL original $98, dist 1R = $2</span>
+
+Precio llega a $102  →  SL sube a $100 (breakeven)
+Precio llega a $104  →  SL sube a $102 (+1R asegurado)
+Precio llega a $106  →  SL sube a $104 (+2R asegurado)
+Precio revierte a $104  →  cierra en $104 = ganancia +2R
+
+<span class="comment">Con TP fijo en 2R habría cerrado en $104 igual,
+pero si el precio seguía a $110 el trailing captura +4R.</span></pre>
+  </div>
+
+  <h3>Uso en backtest</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="comment"># Un trailing específico</span>
+<span class="cmd">python</span> scripts/run_backtest.py --trailing escalones
+
+<span class="comment"># Combinar perfil + trailing</span>
+<span class="cmd">python</span> scripts/run_backtest.py --strategy ob_bos --trailing hibrido
+
+<span class="comment"># Comparar los 4 modos de trailing con el mismo perfil</span>
+<span class="cmd">python</span> scripts/run_backtest.py --compare-trailing
+<span class="cmd">python</span> scripts/run_backtest.py --compare-trailing --strategy ob_bos
+
+<span class="comment"># Comparar perfiles con un trailing fijo</span>
+<span class="cmd">python</span> scripts/run_backtest.py --compare --trailing hibrido
+
+<span class="comment"># Ajustar multiplicador ATR para modo atr</span>
+<span class="cmd">python</span> scripts/run_backtest.py --trailing atr --atr-mult 2.5
+
+<span class="comment"># Ajustar cooldown post-SL (velas de espera)</span>
+<span class="cmd">python</span> scripts/run_backtest.py --trailing escalones --cooldown 5</pre>
+  </div>
+
+  <h3>Métricas nuevas en el reporte</h3>
+  <table>
+    <tr><th>Métrica</th><th>Qué mide</th></tr>
+    <tr><td><code>Avg RR Real</code></td><td>El RR promedio que realmente se logró (no el teórico 1:2)</td></tr>
+    <tr><td><code>Max R Capturado</code></td><td>El máximo R que logró un trade individual</td></tr>
+    <tr><td><code>trailing_mode</code></td><td>Qué modo se usó (aparece en cada trade del JSON)</td></tr>
+  </table>
+
+  <div class="callout warning">
+    <strong>Nota:</strong> El trailing dinámico actualmente funciona solo en el <strong>backtest</strong>. En el bot en vivo (<code>run_bot.py</code>) las órdenes siguen siendo TP/SL fijos ejecutados por Binance como OCO. Una vez que identifiques el mejor modo en backtest, se puede implementar en producción.
+  </div>
+</div>
+
+
+<!-- 15 -->
+<div class="section" id="s15">
+  <div class="section-header">
+    <span class="section-num">15</span>
+    <span class="section-title">Mejoras v2 del motor de backtest</span>
+  </div>
+
+  <p>El motor de backtest incluye varias mejoras respecto a la versión original para producir resultados más realistas:</p>
+
+  <h3>Correcciones</h3>
+  <table>
+    <tr><th>Mejora</th><th>Problema original</th><th>Fix</th></tr>
+    <tr>
+      <td><strong>BOS por posición</strong></td>
+      <td>El slicing de swings usaba labels del índice en vez de posición numérica, pudiendo incluir swings fuera de rango.</td>
+      <td>Cambiado a <code>iloc</code> para slicing correcto.</td>
+    </tr>
+    <tr>
+      <td><strong>Resolución TP/SL conservadora</strong></td>
+      <td>Si una vela tocaba TP y SL, siempre se priorizaba TP (sesgo optimista).</td>
+      <td>Se asume SL primero cuando ambos se tocan en la misma vela.</td>
+    </tr>
+    <tr>
+      <td><strong>Comisiones por tramo</strong></td>
+      <td>Comisión calculada como <code>precio_cierre &times; 2</code> para ambos tramos.</td>
+      <td>Entrada sobre <code>precio_entrada</code>, salida sobre <code>precio_cierre</code>.</td>
+    </tr>
+    <tr>
+      <td><strong>Sharpe por timeframe</strong></td>
+      <td>Se usaba <code>sqrt(252)</code> (datos diarios) para velas de 15 minutos.</td>
+      <td>Anualización correcta según barras/año del timeframe.</td>
+    </tr>
+    <tr>
+      <td><strong>Mitigación de FVGs</strong></td>
+      <td>FVGs ya tocados seguían contando como confluencia válida.</td>
+      <td>Se marcan como mitigados y se excluyen de señales futuras.</td>
+    </tr>
+  </table>
+
+  <h3>Nuevas funcionalidades</h3>
+  <table>
+    <tr><th>Feature</th><th>Descripción</th><th>Default</th></tr>
+    <tr>
+      <td><strong>Cooldown post-SL</strong></td>
+      <td>Después de un stop loss, espera N velas antes de la siguiente entrada. Evita rachas de pérdidas en mercados laterales.</td>
+      <td><code>--cooldown 3</code></td>
+    </tr>
+    <tr>
+      <td><strong>Límite de pérdida diaria</strong></td>
+      <td>Si la pérdida acumulada del día supera el umbral, no se abren nuevas posiciones hasta el día siguiente.</td>
+      <td><code>MAX_DAILY_LOSS=0.03</code> (3%)</td>
+    </tr>
+    <tr>
+      <td><strong>Filtro de volatilidad mínima</strong></td>
+      <td>Descarta señales si el ATR es menor al 0.1% del precio (mercado comprimido, stops muy ajustados).</td>
+      <td>Siempre activo</td>
+    </tr>
+    <tr>
+      <td><strong>Trailing dinámico</strong></td>
+      <td>4 modos de trailing TP/SL. Ver sección 14.</td>
+      <td><code>--trailing none</code></td>
+    </tr>
+  </table>
+</div>
+
+
+<footer>
+  <span>SMC Futures Bot · Guía de Configuración v5.0</span>
+  <span>Binance Futures · Vultr Tokyo · Docker · Cloudflare</span>
+</footer>
+
+</div><!-- /page -->
+
+<script>
+function copiar(btn) {
+  const pre = btn.parentElement.querySelector('pre');
+  const texto = pre.innerText;
+  navigator.clipboard.writeText(texto).then(() => {
+    btn.textContent = '✓ copiado';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'copiar';
+      btn.classList.remove('copied');
+    }, 2000);
+  }).catch(() => {
+    btn.textContent = 'error';
+    setTimeout(() => btn.textContent = 'copiar', 2000);
+  });
+}
+</script>
+</body>
+</html>

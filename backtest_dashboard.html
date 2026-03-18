@@ -3,556 +3,1029 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SMC Bot — Guía de Backtesting</title>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<title>SMC Backtest Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
-:root {
-  --ink:     #0f0f0f;
-  --paper:   #f5f2eb;
-  --cream:   #ede9df;
-  --rule:    #d4cfc4;
-  --accent:  #c1440e;
-  --accent2: #1a5c3a;
-  --code-bg: #1c1c1c;
-  --code-fg: #e8e0d0;
-  --warn:    #8b5e00;
-  --warn-bg: #fdf6e3;
-  --ok:      #1a5c3a;
-  --ok-bg:   #edf7f1;
-}
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
-body { background: var(--paper); color: var(--ink); font-family: 'IBM Plex Mono', monospace; font-size: 13px; line-height: 1.8; min-height: 100vh; }
-body::before { content: ''; position: fixed; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events: none; z-index: 0; opacity: 0.4; }
-.page { max-width: 920px; margin: 0 auto; padding: 0 32px 80px; position: relative; z-index: 1; }
-.cover { border-bottom: 3px double var(--rule); padding: 60px 0 40px; margin-bottom: 48px; }
-.cover-tag { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); margin-bottom: 16px; }
-.cover h1 { font-family: 'DM Serif Display', serif; font-size: clamp(32px, 5vw, 52px); line-height: 1.1; color: var(--ink); margin-bottom: 12px; }
-.cover h1 em { color: var(--accent); font-style: italic; }
-.cover-sub { color: #5a5449; font-size: 12px; margin-bottom: 28px; }
-.cover-meta { display: flex; gap: 24px; flex-wrap: wrap; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #8a8070; padding-top: 20px; border-top: 1px solid var(--rule); }
-.cover-meta span::before { content: '◆ '; color: var(--accent); }
-.toc { background: var(--cream); border: 1px solid var(--rule); border-left: 4px solid var(--accent); padding: 24px 28px; margin-bottom: 48px; }
-.toc h2 { font-family: 'DM Serif Display', serif; font-size: 16px; margin-bottom: 16px; color: var(--ink); }
-.toc ol { padding-left: 20px; }
-.toc li { margin-bottom: 6px; }
-.toc a { color: var(--ink); text-decoration: none; font-size: 12px; border-bottom: 1px dotted var(--rule); transition: color 0.2s; }
-.toc a:hover { color: var(--accent); border-color: var(--accent); }
-.section { margin-bottom: 56px; }
-.section-header { display: flex; align-items: baseline; gap: 16px; border-bottom: 2px solid var(--ink); padding-bottom: 8px; margin-bottom: 28px; }
-.section-num { font-family: 'DM Serif Display', serif; font-size: 42px; color: var(--rule); line-height: 1; flex-shrink: 0; }
-.section-title { font-family: 'DM Serif Display', serif; font-size: 22px; color: var(--ink); }
-h3 { font-family: 'DM Serif Display', serif; font-size: 16px; margin: 28px 0 12px; color: var(--ink); }
-h3::before { content: '§ '; color: var(--accent); font-style: italic; }
-p { margin-bottom: 12px; color: #2a2520; }
-pre { background: var(--code-bg); color: var(--code-fg); border-radius: 4px; padding: 20px 24px; overflow-x: auto; margin: 16px 0; font-size: 12px; line-height: 1.7; position: relative; border-left: 3px solid var(--accent); }
-pre .comment { color: #6a6055; }
-pre .cmd { color: #7ab8f5; }
-pre .val { color: #9ec88a; }
-pre .warn-c { color: #f0c060; }
-code { background: var(--cream); border: 1px solid var(--rule); padding: 1px 5px; border-radius: 2px; font-size: 11px; color: var(--accent); }
-pre code { background: none; border: none; padding: 0; color: inherit; font-size: inherit; }
-.code-block { position: relative; }
-.copy-btn { position: absolute; top: 10px; right: 10px; background: #2e2e2e; border: 1px solid #444; color: #aaa; font-family: 'IBM Plex Mono', monospace; font-size: 10px; padding: 3px 8px; border-radius: 3px; cursor: pointer; transition: all 0.2s; letter-spacing: 0.05em; }
-.copy-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
-.copy-btn.copied { background: var(--accent2); color: #fff; border-color: var(--accent2); }
-.alert { padding: 14px 18px; border-radius: 2px; margin: 16px 0; font-size: 12px; line-height: 1.6; border-left: 4px solid; }
-.alert-warn { background: var(--warn-bg); border-color: var(--warn); color: var(--warn); }
-.alert-ok { background: var(--ok-bg); border-color: var(--ok); color: var(--ok); }
-.alert-info { background: var(--cream); border-color: var(--rule); color: #5a5449; }
-.alert strong { display: block; margin-bottom: 4px; text-transform: uppercase; font-size: 10px; letter-spacing: 0.1em; }
-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 11px; }
-th { background: var(--ink); color: var(--paper); padding: 8px 12px; text-align: left; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; font-size: 10px; }
-td { padding: 8px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
-tr:nth-child(even) td { background: var(--cream); }
-td code { font-size: 11px; }
-footer { border-top: 3px double var(--rule); padding: 24px 0; margin-top: 60px; font-size: 10px; color: #8a8070; display: flex; justify-content: space-between; align-items: center; letter-spacing: 0.05em; }
-@media (max-width: 600px) { .page { padding: 0 16px 60px; } .cover h1 { font-size: 28px; } }
+  :root {
+    --bg:        #080c10;
+    --surface:   #0d1117;
+    --surface2:  #131b24;
+    --border:    #1e2d3d;
+    --accent:    #00d4ff;
+    --accent2:   #7c3aed;
+    --green:     #00e676;
+    --red:       #ff3d57;
+    --yellow:    #ffd600;
+    --text:      #c9d1d9;
+    --muted:     #4a5568;
+    --glow:      0 0 20px rgba(0,212,255,0.15);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg,
+      transparent, transparent 2px,
+      rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 4px);
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ─── HEADER ─── */
+  header {
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #0a1520 0%, var(--bg) 100%);
+    padding: 24px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+    backdrop-filter: blur(12px);
+  }
+  .logo {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .logo-icon {
+    width: 36px; height: 36px;
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    display: grid; place-items: center;
+    font-size: 18px;
+    box-shadow: var(--glow), inset 0 0 12px rgba(0,212,255,0.1);
+    animation: pulse-border 3s ease-in-out infinite;
+  }
+  @keyframes pulse-border {
+    0%,100% { box-shadow: var(--glow), inset 0 0 12px rgba(0,212,255,0.1); }
+    50%      { box-shadow: 0 0 30px rgba(0,212,255,0.3), inset 0 0 20px rgba(0,212,255,0.2); }
+  }
+  .logo-text { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px; }
+  .logo-text span { color: var(--accent); }
+  .header-meta { color: var(--muted); font-size: 11px; text-align: right; }
+  .status-dot {
+    display: inline-block; width: 8px; height: 8px;
+    background: var(--green); border-radius: 50%;
+    margin-right: 6px;
+    animation: blink 2s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  /* ─── LAYOUT ─── */
+  main { padding: 28px 32px; max-width: 1600px; margin: 0 auto; }
+
+  /* ─── UPLOAD ZONE ─── */
+  #upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 16px;
+    padding: 60px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    background: var(--surface);
+    margin-bottom: 32px;
+  }
+  #upload-zone:hover, #upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(0,212,255,0.04);
+    box-shadow: var(--glow);
+  }
+  #upload-zone h2 { font-family:'Syne',sans-serif; font-size:22px; margin-bottom:8px; color:var(--accent); }
+  #upload-zone p  { color: var(--muted); font-size:12px; margin-top:8px; }
+  #file-input { display:none; }
+  .upload-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.6; }
+
+  /* Demo button */
+  .btn-demo {
+    margin-top: 20px;
+    padding: 10px 24px;
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    border: none; border-radius: 8px; color: #fff;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; cursor: pointer; font-weight: 600;
+    transition: opacity 0.2s; letter-spacing: 0.05em;
+  }
+  .btn-demo:hover { opacity: 0.85; }
+
+  /* ─── DASHBOARD (hidden by default) ─── */
+  #dashboard { display: none; }
+
+  /* ─── KPI GRID ─── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .kpi {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    position: relative; overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+    animation: fadeUp 0.5s ease both;
+  }
+  .kpi:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--glow);
+    border-color: rgba(0,212,255,0.3);
+  }
+  .kpi::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0.5;
+  }
+  .kpi-label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
+  .kpi-value { font-family: 'Syne', sans-serif; font-size: 26px; font-weight: 800; line-height: 1; }
+  .kpi-sub   { color: var(--muted); font-size: 10px; margin-top: 4px; }
+  .kpi-green { color: var(--green); }
+  .kpi-red   { color: var(--red); }
+  .kpi-yellow{ color: var(--yellow); }
+  .kpi-accent{ color: var(--accent); }
+  @keyframes fadeUp {
+    from { opacity:0; transform:translateY(16px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  /* ─── SECTION ─── */
+  .section-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.12em;
+    color: var(--accent); margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-title::after {
+    content: ''; flex: 1; height: 1px;
+    background: linear-gradient(90deg, var(--border), transparent);
+  }
+
+  /* ─── CHART GRID ─── */
+  .chart-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 28px;
+  }
+  .chart-grid.wide { grid-template-columns: 1fr; }
+  .chart-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 24px;
+  }
+  .chart-box h3 {
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--muted); margin-bottom: 16px;
+  }
+  .chart-container { position: relative; height: 220px; }
+  .chart-container.tall { height: 320px; }
+
+  /* ─── TRADES TABLE ─── */
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 28px;
+  }
+  .table-header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { background: var(--surface2); }
+  th {
+    padding: 10px 16px; text-align: left;
+    font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 10px 16px;
+    border-bottom: 1px solid rgba(30,45,61,0.5);
+    font-size: 12px;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(0,212,255,0.03); }
+  .badge {
+    display: inline-block; padding: 2px 8px;
+    border-radius: 4px; font-size: 10px; font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+  .badge-win  { background: rgba(0,230,118,0.15); color: var(--green); border:1px solid rgba(0,230,118,0.3); }
+  .badge-loss { background: rgba(255,61,87,0.15);  color: var(--red);   border:1px solid rgba(255,61,87,0.3); }
+  .badge-long  { background: rgba(0,212,255,0.1);   color: var(--accent); border:1px solid rgba(0,212,255,0.3); }
+  .badge-short { background: rgba(124,58,237,0.1);  color: #a78bfa;       border:1px solid rgba(124,58,237,0.3); }
+  .badge-sesion{ background: rgba(255,214,0,0.1);   color: var(--yellow); border:1px solid rgba(255,214,0,0.3); font-size:9px; }
+
+  .pnl-pos { color: var(--green); font-weight: 700; }
+  .pnl-neg { color: var(--red);   font-weight: 700; }
+
+  /* filter tabs */
+  .filter-tabs { display:flex; gap:8px; }
+  .filter-tab {
+    padding: 4px 12px; border-radius: 6px;
+    font-size: 11px; cursor: pointer;
+    border: 1px solid var(--border);
+    background: transparent; color: var(--muted);
+    transition: all 0.2s;
+  }
+  .filter-tab.active, .filter-tab:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0,212,255,0.08);
+  }
+
+  /* session grid */
+  .session-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr));
+    gap: 12px; margin-bottom: 28px;
+  }
+  .session-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .session-name { font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:var(--muted); margin-bottom:8px; }
+  .session-wr { font-family:'Syne',sans-serif; font-size:24px; font-weight:800; }
+  .session-row { display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-top:4px; }
+
+  /* ─── ANALYSIS BOX ─── */
+  .analysis-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    margin-bottom: 28px;
+  }
+  .analysis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .analysis-item { }
+  .analysis-label { font-size:10px; text-transform:uppercase; letter-spacing:0.1em; color:var(--muted); margin-bottom:4px; }
+  .analysis-value { font-size:14px; }
+
+  /* progress bar */
+  .progress-bar {
+    height: 6px; background: var(--border); border-radius: 3px; margin-top: 6px; overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%; border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent2), var(--accent));
+    transition: width 1s ease;
+  }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 900px) {
+    .chart-grid { grid-template-columns: 1fr; }
+    .kpi-grid   { grid-template-columns: repeat(2,1fr); }
+    main { padding: 16px; }
+    header { padding: 16px; }
+  }
+
+  /* ─── FOOTER ─── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 16px 32px;
+    color: var(--muted); font-size: 10px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
 </style>
 </head>
 <body>
-<div class="page">
 
-<!-- PORTADA -->
-<div class="cover">
-  <div class="cover-tag">Referencia de backtesting · v1.0</div>
-  <h1>SMC Futures Bot<br><em>Guía de Backtesting</em></h1>
-  <div class="cover-sub">Todos los parámetros CLI, opciones de prueba y plan de exploración sistemática</div>
-  <div class="cover-meta">
-    <span>run_backtest.py</span>
-    <span>run_systematic.py</span>
-    <span>Ventanas horarias</span>
-    <span>Perfiles</span>
-    <span>Trailing</span>
+<header>
+  <div class="logo">
+    <div class="logo-icon">📊</div>
+    <div>
+      <div class="logo-text">SMC <span>BACKTEST</span></div>
+      <div style="color:var(--muted);font-size:10px;margin-top:2px;">Smart Money Concepts · Binance Futures</div>
+    </div>
   </div>
-</div>
+  <div class="header-meta">
+    <div><span class="status-dot"></span>Dashboard v2.0 — Fase 2</div>
+    <div id="header-period" style="margin-top:2px;"></div>
+  </div>
+</header>
 
-<!-- ÍNDICE -->
-<div class="toc">
-  <h2>Índice</h2>
-  <ol>
-    <li><a href="#s1">Referencia CLI: run_backtest.py</a></li>
-    <li><a href="#s2">Referencia CLI: run_systematic.py</a></li>
-    <li><a href="#s3">Ventanas horarias (Trading Windows)</a></li>
-    <li><a href="#s4">Plan de pruebas: Timeframes y Ventanas</a></li>
-    <li><a href="#s5">Plan de pruebas: Perfiles y Trailing</a></li>
-    <li><a href="#s6">Plan de pruebas: Parámetros de riesgo</a></li>
-    <li><a href="#s7">Plan de pruebas: Multi-trade</a></li>
-    <li><a href="#s8">Mega-comparación: comandos listos para copiar</a></li>
-    <li><a href="#s9">Cómo interpretar los resultados</a></li>
-    <li><a href="#s10">Comparar resultados: compare_results.py</a></li>
-  </ol>
-</div>
+<main>
 
-
-<!-- 1 -->
-<div class="section" id="s1">
-  <div class="section-header">
-    <span class="section-num">01</span>
-    <span class="section-title">Referencia CLI: run_backtest.py</span>
+  <!-- UPLOAD ZONE -->
+  <div id="upload-zone" onclick="document.getElementById('file-input').click()">
+    <div class="upload-icon">📂</div>
+    <h2>Cargar resultados del backtest</h2>
+    <p>Arrastra el archivo <code>backtest_results.json</code> aquí<br>o haz clic para seleccionarlo</p>
+    <button class="btn-demo" onclick="event.stopPropagation(); cargarDemo()">
+      ▶  Ver con datos de demostración
+    </button>
+    <input type="file" id="file-input" accept=".json" onchange="cargarArchivo(event)">
   </div>
 
-  <table>
-    <tr><th>Parámetro</th><th>Valores</th><th>Default</th><th>Descripción</th></tr>
-    <tr><td><code>--symbol</code></td><td><code>ETHUSDT</code>, <code>BTCUSDT</code></td><td>.env</td><td>Par de trading</td></tr>
-    <tr><td><code>--timeframe</code></td><td><code>15m</code>, <code>1h</code></td><td>.env</td><td>Temporalidad de las velas</td></tr>
-    <tr><td><code>--dias</code></td><td>1–730</td><td>90</td><td>Días de historia a descargar</td></tr>
-    <tr><td><code>--capital</code></td><td>cualquier número</td><td>1000</td><td>Capital inicial en USDT</td></tr>
-    <tr><td><code>--strategy</code></td><td><code>base</code>, <code>ob_bos</code>, <code>ema_filter</code>, <code>ob_bos_ema</code></td><td>base</td><td>Perfil de estrategia</td></tr>
-    <tr><td><code>--trailing</code></td><td><code>none</code>, <code>escalones</code>, <code>atr</code>, <code>hibrido</code></td><td>none</td><td>Modo de trailing stop</td></tr>
-    <tr><td><code>--max-trades</code></td><td>1–5</td><td>1</td><td>Trades simultáneos máximos</td></tr>
-    <tr><td><code>--racha-reduce</code></td><td>1–10</td><td>3</td><td>Tras N SL seguidos, baja a 1 trade</td></tr>
-    <tr><td><code>--cooldown</code></td><td>0–20</td><td>3</td><td>Velas de espera después de un SL</td></tr>
-    <tr><td><code>--windows</code></td><td><code>8-11,13-18</code></td><td>.env</td><td>Ventanas horarias UTC (override .env)</td></tr>
-    <tr><td><code>--score</code></td><td>0–100</td><td>.env</td><td>Score mínimo para operar (override .env)</td></tr>
-    <tr><td><code>--rr</code></td><td>1.0–10.0</td><td>.env</td><td>Ratio riesgo:recompensa (override .env)</td></tr>
-    <tr><td><code>--atr-mult</code></td><td>0.5–5.0</td><td>2.0</td><td>Multiplicador ATR para trailing ATR</td></tr>
-    <tr><td><code>--compare</code></td><td>flag</td><td>—</td><td>Comparar todos los perfiles</td></tr>
-    <tr><td><code>--compare-trailing</code></td><td>flag</td><td>—</td><td>Comparar los 4 modos de trailing</td></tr>
-    <tr><td><code>--profiles</code></td><td>lista</td><td>todos</td><td>Perfiles específicos a comparar</td></tr>
-    <tr><td><code>--output</code></td><td>nombre.json</td><td>auto</td><td>Nombre del JSON de salida</td></tr>
-    <tr><td><code>--list-profiles</code></td><td>flag</td><td>—</td><td>Listar perfiles y salir</td></tr>
-  </table>
-
-  <h3>Ejemplo básico</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 1h --dias 180</pre>
-  </div>
-
-  <h3>Ejemplo completo con todos los overrides</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 360 --strategy ob_bos --trailing hibrido --max-trades 2 --windows 8-11,13-18 --score 50 --rr 2.0</pre>
-  </div>
-</div>
-
-
-<!-- 2 -->
-<div class="section" id="s2">
-  <div class="section-header">
-    <span class="section-num">02</span>
-    <span class="section-title">Referencia CLI: run_systematic.py</span>
-  </div>
-
-  <table>
-    <tr><th>Parámetro</th><th>Valores</th><th>Default</th><th>Descripción</th></tr>
-    <tr><td><code>--symbol</code></td><td><code>ETHUSDT</code>, <code>BTCUSDT</code></td><td>auto</td><td>Forzar par (salta Fase 1)</td></tr>
-    <tr><td><code>--timeframe</code></td><td><code>15m</code>, <code>1h</code></td><td>auto</td><td>Forzar timeframe (salta Fase 1)</td></tr>
-    <tr><td><code>--dias</code></td><td>1–730</td><td>90</td><td>Días de historia</td></tr>
-    <tr><td><code>--capital</code></td><td>cualquier número</td><td>1000</td><td>Capital inicial</td></tr>
-    <tr><td><code>--max-trades</code></td><td>1–5</td><td>1</td><td>Trades simultáneos</td></tr>
-    <tr><td><code>--racha-reduce</code></td><td>1–10</td><td>3</td><td>Reducir tras N SL seguidos</td></tr>
-    <tr><td><code>--windows</code></td><td><code>8-11,13-18</code></td><td>.env</td><td>Ventanas horarias UTC</td></tr>
-    <tr><td><code>--output</code></td><td>nombre.json</td><td>auto</td><td>Nombre del JSON</td></tr>
-  </table>
-
-  <p>El systematic prueba automáticamente en 5 fases: par+timeframe, perfil+trailing, score+ATR, TP/RR ratio, y trailing final.</p>
-
-  <h3>Ejemplo: optimización completa sobre ETH/1h con ventanas</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">python</span> scripts/run_systematic.py --symbol ETHUSDT --timeframe 1h --dias 360 --max-trades 2 --windows 8-11,13-18</pre>
-  </div>
-</div>
-
-
-<!-- 3 -->
-<div class="section" id="s3">
-  <div class="section-header">
-    <span class="section-num">03</span>
-    <span class="section-title">Ventanas horarias (Trading Windows)</span>
-  </div>
-
-  <p>Las ventanas definen en qué horas UTC el bot puede abrir trades. Fuera de esas horas, el bot analiza y detecta señales pero no opera.</p>
-
-  <table>
-    <tr><th>Ventana</th><th>Horario UTC</th><th>GMT-3 (Argentina)</th><th>Qué cubre</th></tr>
-    <tr><td><code>8-11</code></td><td>08:00 – 11:00</td><td>05:00 – 08:00</td><td>Apertura London</td></tr>
-    <tr><td><code>13-18</code></td><td>13:00 – 18:00</td><td>10:00 – 15:00</td><td>Core New York</td></tr>
-    <tr><td><code>7-16</code></td><td>07:00 – 16:00</td><td>04:00 – 13:00</td><td>London completa</td></tr>
-    <tr><td><code>12-21</code></td><td>12:00 – 21:00</td><td>09:00 – 18:00</td><td>New York completa</td></tr>
-    <tr><td><code>2-10</code></td><td>02:00 – 10:00</td><td>23:00 – 07:00</td><td>Asia completa</td></tr>
-    <tr><td><code>8-11,13-18</code></td><td>combinado</td><td>combinado</td><td>Aperturas London + NY</td></tr>
-    <tr><td>(vacío)</td><td>24h</td><td>24h</td><td>Sin filtro horario</td></tr>
-  </table>
-
-  <h3>Formato</h3>
-  <p>Las ventanas se definen como <code>HH-HH</code> separadas por coma. Ejemplo: <code>8-11,13-18</code> significa que solo se opera de 8 a 11 y de 13 a 18 UTC.</p>
-
-  <div class="alert alert-info">
-    <strong>Tip</strong>
-    Una ventana vacía (<code>--windows ""</code>) desactiva el filtro y opera 24 horas. Útil para comparar con y sin filtro.
-  </div>
-</div>
-
-
-<!-- 4 -->
-<div class="section" id="s4">
-  <div class="section-header">
-    <span class="section-num">04</span>
-    <span class="section-title">Plan de pruebas: Timeframes y Ventanas</span>
-  </div>
-
-  <p>Objetivo: encontrar la mejor combinación de timeframe y ventana horaria. Los timeframes cortos generan más señales pero son más ruidosos.</p>
-
-  <h3>Test 4.1 — ETH/15m por ventana horaria (180 días)</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="comment"># Solo apertura London</span>
-<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows 8-11
-
-<span class="comment"># Solo core New York</span>
-<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows 13-18
-
-<span class="comment"># Ambas aperturas</span>
-<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows 8-11,13-18
-
-<span class="comment"># London completa</span>
-<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows 7-16
-
-<span class="comment"># Sin filtro (24h)</span>
-<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows ""</pre>
-  </div>
-
-  <h3>Test 4.2 — ETH/1h por ventana horaria (360 días)</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 1h --dias 360 --windows 8-11
-<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 1h --dias 360 --windows 13-18
-<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 1h --dias 360 --windows 8-11,13-18
-<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 1h --dias 360 --windows ""</pre>
-  </div>
-
-  <h3>Test 4.3 — BTC mismas ventanas (comparar pares)</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">python</span> scripts/run_backtest.py --symbol BTCUSDT --timeframe 15m --dias 180 --windows 8-11,13-18
-<span class="cmd">python</span> scripts/run_backtest.py --symbol BTCUSDT --timeframe 1h --dias 360 --windows 8-11,13-18</pre>
-  </div>
-
-  <h3>Test 4.4 — Ventanas granulares (encontrar la hora óptima)</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="comment"># Probar cada hora de London</span>
-<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows 7-9
-<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows 9-11
-<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows 11-13
-
-<span class="comment"># Probar cada hora de NY</span>
-<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows 13-15
-<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows 15-17
-<span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows 17-19</pre>
-  </div>
-</div>
-
-
-<!-- 5 -->
-<div class="section" id="s5">
-  <div class="section-header">
-    <span class="section-num">05</span>
-    <span class="section-title">Plan de pruebas: Perfiles y Trailing</span>
-  </div>
-
-  <h3>Perfiles disponibles</h3>
-  <table>
-    <tr><th>Perfil</th><th>Filtros</th><th>Trades esperados</th></tr>
-    <tr><td><code>base</code></td><td>FVG + OB + BOS. Sin filtros extra.</td><td>Muchos</td></tr>
-    <tr><td><code>ob_bos</code></td><td>Solo OBs precedidos por BOS</td><td>Menos, más selectivo</td></tr>
-    <tr><td><code>ema_filter</code></td><td>EMA 50/200 + distancia + confirmación</td><td>Moderado</td></tr>
-    <tr><td><code>ob_bos_ema</code></td><td>ob_bos + ema_filter combinados</td><td>Muy pocos, ultra selectivo</td></tr>
-  </table>
-
-  <h3>Test 5.1 — Comparar todos los perfiles en la mejor ventana</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">python</span> scripts/run_backtest.py --compare --timeframe 1h --dias 360 --windows 8-11,13-18</pre>
-  </div>
-
-  <h3>Test 5.2 — Comparar trailing con el mejor perfil</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">python</span> scripts/run_backtest.py --compare-trailing --strategy ob_bos --timeframe 1h --dias 360 --windows 8-11,13-18</pre>
-  </div>
-
-  <h3>Test 5.3 — Cada perfil × cada trailing (15m, ventana London)</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">python</span> scripts/run_backtest.py --strategy base --trailing none --timeframe 15m --dias 180 --windows 8-11
-<span class="cmd">python</span> scripts/run_backtest.py --strategy base --trailing hibrido --timeframe 15m --dias 180 --windows 8-11
-<span class="cmd">python</span> scripts/run_backtest.py --strategy ob_bos --trailing none --timeframe 15m --dias 180 --windows 8-11
-<span class="cmd">python</span> scripts/run_backtest.py --strategy ob_bos --trailing hibrido --timeframe 15m --dias 180 --windows 8-11</pre>
-  </div>
-</div>
-
-
-<!-- 6 -->
-<div class="section" id="s6">
-  <div class="section-header">
-    <span class="section-num">06</span>
-    <span class="section-title">Plan de pruebas: Parámetros de riesgo</span>
-  </div>
-
-  <h3>Test 6.1 — Barrido de RR ratio</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18 --rr 1.5
-<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18 --rr 2.0
-<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18 --rr 2.5
-<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18 --rr 3.0
-<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18 --rr 4.0</pre>
-  </div>
-
-  <h3>Test 6.2 — Barrido de score mínimo</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18 --score 40
-<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18 --score 50
-<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18 --score 65
-<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18 --score 75</pre>
-  </div>
-
-  <h3>Test 6.3 — Cooldown post-SL</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --cooldown 0
-<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --cooldown 3
-<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --cooldown 5
-<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --cooldown 10</pre>
-  </div>
-</div>
-
-
-<!-- 7 -->
-<div class="section" id="s7">
-  <div class="section-header">
-    <span class="section-num">07</span>
-    <span class="section-title">Plan de pruebas: Multi-trade</span>
-  </div>
-
-  <h3>Test 7.1 — 1 vs 2 vs 3 trades</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --max-trades 1 --windows 8-11,13-18
-<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --max-trades 2 --windows 8-11,13-18
-<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --max-trades 3 --windows 8-11,13-18</pre>
-  </div>
-
-  <h3>Test 7.2 — Racha de SL: 2 vs 3 vs 5 para reducir</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --max-trades 2 --racha-reduce 2
-<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --max-trades 2 --racha-reduce 3
-<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --max-trades 2 --racha-reduce 5</pre>
-  </div>
-
-  <h3>Test 7.3 — Multi-trade en 15m (más señales simultáneas)</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">python</span> scripts/run_backtest.py --timeframe 15m --dias 180 --max-trades 1 --windows 8-11,13-18
-<span class="cmd">python</span> scripts/run_backtest.py --timeframe 15m --dias 180 --max-trades 2 --windows 8-11,13-18</pre>
-  </div>
-</div>
-
-
-<!-- 8 -->
-<div class="section" id="s8">
-  <div class="section-header">
-    <span class="section-num">08</span>
-    <span class="section-title">Mega-comparación: comandos listos para copiar</span>
-  </div>
-
-  <p>Comandos encadenados con <code>&&</code> para correr uno tras otro. Cada grupo tarda entre 5–30 minutos según los días.</p>
-
-  <h3>Batch 1: ETH/1h ventanas horarias (360 días)</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 1h --dias 360 --windows 8-11 && <span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 1h --dias 360 --windows 13-18 && <span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 1h --dias 360 --windows 8-11,13-18 && <span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 1h --dias 360 --windows ""</pre>
-  </div>
-
-  <h3>Batch 2: ETH/15m ventanas horarias (180 días)</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows 8-11 && <span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows 13-18 && <span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows 8-11,13-18 && <span class="cmd">python</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 15m --dias 180 --windows ""</pre>
-  </div>
-
-  <h3>Batch 3: Systematic completo ETH/1h con ventanas (360 días)</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">python</span> scripts/run_systematic.py --symbol ETHUSDT --timeframe 1h --dias 360 --max-trades 2 --windows 8-11,13-18</pre>
-  </div>
-
-  <h3>Batch 4: Comparación 15m ventanas granulares (180 días)</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">python</span> scripts/run_backtest.py --timeframe 15m --dias 180 --windows 7-9 && <span class="cmd">python</span> scripts/run_backtest.py --timeframe 15m --dias 180 --windows 9-11 && <span class="cmd">python</span> scripts/run_backtest.py --timeframe 15m --dias 180 --windows 11-13 && <span class="cmd">python</span> scripts/run_backtest.py --timeframe 15m --dias 180 --windows 13-15 && <span class="cmd">python</span> scripts/run_backtest.py --timeframe 15m --dias 180 --windows 15-17 && <span class="cmd">python</span> scripts/run_backtest.py --timeframe 15m --dias 180 --windows 17-19</pre>
-  </div>
-
-  <h3>Batch 5: RR sweep en la mejor config</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18 --max-trades 2 --rr 1.5 && <span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18 --max-trades 2 --rr 2.0 && <span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18 --max-trades 2 --rr 2.5 && <span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18 --max-trades 2 --rr 3.0</pre>
-  </div>
-</div>
-
-
-<!-- 9 -->
-<div class="section" id="s9">
-  <div class="section-header">
-    <span class="section-num">09</span>
-    <span class="section-title">Cómo interpretar los resultados</span>
-  </div>
-
-  <h3>Métricas clave (en orden de importancia)</h3>
-  <table>
-    <tr><th>Métrica</th><th>Qué buscar</th><th>Red flag</th></tr>
-    <tr><td><strong>Profit Factor</strong></td><td>≥ 1.3 es bueno, ≥ 1.5 excelente</td><td>&lt; 1.0 pierde dinero</td></tr>
-    <tr><td><strong>Win Rate</strong></td><td>35–55% con RR 1:2 es viable</td><td>&lt; 25% con cualquier RR</td></tr>
-    <tr><td><strong>Total trades</strong></td><td>≥ 50 para ser estadísticamente confiable</td><td>&lt; 20 trades = no confiar</td></tr>
-    <tr><td><strong>Max Drawdown</strong></td><td>≤ 15% es cómodo, ≤ 10% ideal</td><td>&gt; 30% es peligroso</td></tr>
-    <tr><td><strong>Retorno</strong></td><td>Relativo al DD. Retorno/DD &gt; 2 es bueno</td><td>Alto retorno con alto DD = suerte</td></tr>
-  </table>
-
-  <h3>Señales de sobreajuste (overfitting)</h3>
-  <p>Si una configuración da resultados espectaculares en 90 días pero mediocres en 360 días, es sobreajuste. Siempre validá con el período más largo posible.</p>
-
-  <div class="alert alert-warn">
-    <strong>Regla de oro</strong>
-    Preferí configuraciones con PF alto y DD bajo sobre configuraciones con retorno alto y DD alto. Un PF de 1.5 con DD 10% es mucho mejor que un PF de 1.2 con DD 30%, aunque el segundo tenga más retorno bruto.
-  </div>
-
-  <h3>Flujo recomendado de testing</h3>
-  <ol style="padding-left: 20px; margin: 12px 0;">
-    <li style="margin-bottom: 8px;">Correr <strong>Batch 1</strong> (ventanas en 1h) → encontrar la mejor ventana</li>
-    <li style="margin-bottom: 8px;">Correr <strong>Batch 2</strong> (ventanas en 15m) → comparar con 1h</li>
-    <li style="margin-bottom: 8px;">Con la mejor ventana, correr <strong>Batch 3</strong> (systematic completo)</li>
-    <li style="margin-bottom: 8px;">Afinar con <strong>Batch 4</strong> (ventanas granulares) si 15m es mejor</li>
-    <li style="margin-bottom: 8px;">Confirmar RR con <strong>Batch 5</strong></li>
-    <li style="margin-bottom: 8px;">Configurar el bot con los parámetros ganadores</li>
-  </ol>
-</div>
-
-
-<!-- 10 -->
-<div class="section" id="s10">
-  <div class="section-header">
-    <span class="section-num">10</span>
-    <span class="section-title">Comparar resultados: compare_results.py</span>
-  </div>
-
-  <p>Después de correr múltiples backtests, usá este script para comparar todos los resultados en una tabla con colores y ranking automático.</p>
-
-  <table>
-    <tr><th>Parámetro</th><th>Valores</th><th>Default</th><th>Descripción</th></tr>
-    <tr><td><code>files</code></td><td>patrones glob</td><td>todos</td><td>Archivos JSON a comparar. Soporta wildcards (<code>bt_ethusdt*.json</code>)</td></tr>
-    <tr><td><code>--dir</code></td><td>ruta</td><td>backtest/results</td><td>Directorio donde buscar JSONs</td></tr>
-    <tr><td><code>--top</code></td><td>1–100</td><td>todos</td><td>Mostrar solo los N mejores resultados</td></tr>
-    <tr><td><code>--sort</code></td><td><code>ret</code>, <code>pf</code>, <code>wr</code>, <code>dd</code>, <code>trades</code>, <code>sharpe</code></td><td>ret</td><td>Métrica para ordenar</td></tr>
-    <tr><td><code>--min-trades</code></td><td>1–1000</td><td>0</td><td>Filtrar resultados con menos de N trades</td></tr>
-    <tr><td><code>--csv</code></td><td>nombre.csv</td><td>—</td><td>Exportar comparación a CSV</td></tr>
-  </table>
-
-  <h3>Comparar todos los backtests</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">python</span> scripts/compare_results.py</pre>
-  </div>
-
-  <h3>Top 5 ordenados por Profit Factor</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">python</span> scripts/compare_results.py --top 5 --sort pf</pre>
-  </div>
-
-  <h3>Solo resultados confiables (50+ trades), menor drawdown primero</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">python</span> scripts/compare_results.py --min-trades 50 --sort dd</pre>
-  </div>
-
-  <h3>Comparar solo los de ETH/1h</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">python</span> scripts/compare_results.py bt_ethusdt_1h*.json</pre>
-  </div>
-
-  <h3>Comparar solo los de 15m con ventanas</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">python</span> scripts/compare_results.py bt_ethusdt_15m*w*.json</pre>
-  </div>
-
-  <h3>Exportar a CSV para Excel</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="cmd">python</span> scripts/compare_results.py --csv comparacion.csv</pre>
-  </div>
-
-  <h3>Flujo completo recomendado</h3>
-  <div class="code-block">
-    <button class="copy-btn" onclick="copiar(this)">copiar</button>
-    <pre><span class="comment"># 1. Correr backtests con diferentes configs</span>
-<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11
-<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 13-18
-<span class="cmd">python</span> scripts/run_backtest.py --timeframe 1h --dias 360 --windows 8-11,13-18
-<span class="cmd">python</span> scripts/run_backtest.py --timeframe 15m --dias 180 --windows 8-11,13-18
-
-<span class="comment"># 2. Comparar todos los resultados</span>
-<span class="cmd">python</span> scripts/compare_results.py --sort pf --min-trades 30
-
-<span class="comment"># 3. Ver solo el top 3</span>
-<span class="cmd">python</span> scripts/compare_results.py --top 3 --sort pf</pre>
-  </div>
-
-  <div class="alert alert-ok">
-    <strong>Tip</strong>
-    La tabla muestra colores automáticos: verde para métricas buenas, amarillo para mediocres, rojo para malas. PF ≥ 1.3 es verde, WR ≥ 40% es verde, DD ≤ 10% es verde.
-  </div>
-</div>
-
+  <!-- DASHBOARD -->
+  <div id="dashboard">
+
+    <!-- KPIs -->
+    <div class="section-title">📈 Resumen de Performance</div>
+    <div class="kpi-grid" id="kpi-grid"></div>
+
+    <!-- EQUITY CURVE -->
+    <div class="section-title">💹 Curva de Equity</div>
+    <div class="chart-grid wide">
+      <div class="chart-box">
+        <h3>Capital a lo largo del tiempo</h3>
+        <div class="chart-container tall">
+          <canvas id="equityChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHARTS ROW 2 -->
+    <div class="section-title">🔍 Análisis de Trades</div>
+    <div class="chart-grid">
+      <div class="chart-box">
+        <h3>Distribución de PnL por trade</h3>
+        <div class="chart-container">
+          <canvas id="pnlDistChart"></canvas>
+        </div>
+      </div>
+      <div class="chart-box">
+        <h3>PnL acumulado</h3>
+        <div class="chart-container">
+          <canvas id="cumulativePnl"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHARTS ROW 3 -->
+    <div class="chart-grid">
+      <div class="chart-box">
+        <h3>Win rate por hora del día (UTC)</h3>
+        <div class="chart-container">
+          <canvas id="hourChart"></canvas>
+        </div>
+      </div>
+      <div class="chart-box">
+        <h3>Win vs Loss por mes</h3>
+        <div class="chart-container">
+          <canvas id="monthChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- SESSIONS -->
+    <div class="section-title">🌍 Rendimiento por Sesión</div>
+    <div class="session-grid" id="session-grid"></div>
+
+    <!-- TRADES TABLE -->
+    <div class="section-title">🗒️  Historial de Trades</div>
+    <div class="table-wrap">
+      <div class="table-header">
+        <span style="font-size:12px;color:var(--muted);">
+          <span id="trade-count"></span>
+        </span>
+        <div class="filter-tabs">
+          <button class="filter-tab active" onclick="filtrarTrades('all',this)">Todos</button>
+          <button class="filter-tab" onclick="filtrarTrades('WIN',this)">Wins</button>
+          <button class="filter-tab" onclick="filtrarTrades('LOSS',this)">Losses</button>
+          <button class="filter-tab" onclick="filtrarTrades('LONG',this)">Long</button>
+          <button class="filter-tab" onclick="filtrarTrades('SHORT',this)">Short</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Entrada</th>
+              <th>Salida</th>
+              <th>Dir</th>
+              <th>Precio In</th>
+              <th>Precio Out</th>
+              <th>SL</th>
+              <th>TP</th>
+              <th>Tamaño</th>
+              <th>PnL USD</th>
+              <th>PnL %</th>
+              <th>Dur</th>
+              <th>Sesión</th>
+              <th>Score</th>
+              <th>R Máx</th>
+              <th>Resultado</th>
+            </tr>
+          </thead>
+          <tbody id="trades-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /dashboard -->
+</main>
 
 <footer>
-  <span>SMC Futures Bot · Guía de Backtesting v1.0</span>
-  <span>run_backtest.py · run_systematic.py · compare_results.py</span>
+  <span>SMC Backtest Engine · v2.0 · Perfiles + Trailing Dinámico</span>
+  <span id="footer-info"></span>
 </footer>
 
-</div><!-- /page -->
-
 <script>
-function copiar(btn) {
-  var pre = btn.parentElement.querySelector('pre');
-  var texto = pre.innerText;
-  navigator.clipboard.writeText(texto).then(function() {
-    btn.textContent = '✓ copiado';
-    btn.classList.add('copied');
-    setTimeout(function() {
-      btn.textContent = 'copiar';
-      btn.classList.remove('copied');
-    }, 2000);
-  }).catch(function() {
-    btn.textContent = 'error';
-    setTimeout(function() { btn.textContent = 'copiar'; }, 2000);
+// ═══════════════════════════════════════════
+//  ESTADO GLOBAL
+// ═══════════════════════════════════════════
+let DATA = null;
+let charts = {};
+
+// ═══════════════════════════════════════════
+//  DRAG & DROP
+// ═══════════════════════════════════════════
+const zone = document.getElementById('upload-zone');
+zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('drag-over'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+zone.addEventListener('drop', e => {
+  e.preventDefault(); zone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) leerJSON(file);
+});
+
+function cargarArchivo(e) {
+  const file = e.target.files[0];
+  if (file) leerJSON(file);
+}
+function leerJSON(file) {
+  const r = new FileReader();
+  r.onload = ev => {
+    try {
+      const raw = JSON.parse(ev.target.result);
+      // Detectar formato comparación
+      if (raw.comparacion && raw.perfiles) {
+        inicializarComparacion(raw.perfiles);
+      } else {
+        inicializar(raw);
+      }
+    } catch(e) {
+      alert('Error al leer JSON: ' + e.message);
+    }
+  };
+  r.readAsText(file);
+}
+
+// ═══════════════════════════════════════════
+//  DATOS DE DEMO
+// ═══════════════════════════════════════════
+function cargarDemo() {
+  const demo = generarDemo();
+  inicializar(demo);
+}
+
+function generarDemo() {
+  const rng = (a,b) => Math.random()*(b-a)+a;
+  const capital0 = 1000;
+  let capital = capital0;
+  const trades = [];
+  const equity = [{ t: '2024-10-01T00:00:00', v: capital }];
+  const sesiones = ['london','new_york','asia'];
+  const dirs = ['LONG','SHORT'];
+
+  let fecha = new Date('2024-10-01');
+  for (let i = 0; i < 87; i++) {
+    fecha = new Date(fecha.getTime() + rng(60,480)*60000);
+    const dir  = dirs[Math.floor(Math.random()*2)];
+    const ses  = sesiones[Math.floor(Math.random()*3)];
+    const win  = Math.random() < 0.52;   // 52% win rate
+    const pe   = rng(58000, 72000);
+    const atr  = rng(200, 600);
+    const sl   = dir==='LONG' ? pe - atr*1.5 : pe + atr*1.5;
+    const tp   = dir==='LONG' ? pe + atr*3   : pe - atr*3;
+    const sz   = (capital * 0.01) / (atr*1.5);
+    const pnl  = win ? sz*(atr*3)*0.9996 : -sz*(atr*1.5)*1.0004;
+    capital   += pnl;
+    const fechaOut = new Date(fecha.getTime() + rng(15,240)*60000);
+    trades.push({
+      id: i+1,
+      timestamp_in:   fecha.toISOString(),
+      timestamp_out:  fechaOut.toISOString(),
+      direccion:      dir,
+      precio_entrada: +pe.toFixed(2),
+      precio_salida:  +(win ? tp : sl).toFixed(2),
+      stop_loss:      +sl.toFixed(2),
+      take_profit:    +tp.toFixed(2),
+      tamaño:         +sz.toFixed(6),
+      pnl_usd:        +pnl.toFixed(4),
+      pnl_pct:        +(pnl/capital0*100).toFixed(3),
+      resultado:      win ? 'WIN' : 'LOSS',
+      duracion_min:   Math.round((fechaOut-fecha)/60000),
+      score_señal:    Math.round(rng(50,100)),
+      motivos:        ['FVG alcista detectado','BOS confirmado'],
+      capital_post:   +capital.toFixed(2),
+      sesion:         ses,
+      atr_entrada:    +atr.toFixed(2),
+    });
+    equity.push({ t: fechaOut.toISOString(), v: +capital.toFixed(2) });
+  }
+
+  const wins   = trades.filter(t=>t.resultado==='WIN');
+  const losses = trades.filter(t=>t.resultado==='LOSS');
+  const porSesion = {};
+  trades.forEach(t => {
+    if (!porSesion[t.sesion]) porSesion[t.sesion] = {total:0,wins:0,pnl:0};
+    porSesion[t.sesion].total++;
+    if (t.resultado==='WIN') porSesion[t.sesion].wins++;
+    porSesion[t.sesion].pnl += t.pnl_usd;
   });
+  const porHora = {};
+  trades.forEach(t => {
+    const h = new Date(t.timestamp_in).getUTCHours().toString();
+    if (!porHora[h]) porHora[h] = {total:0,wins:0,pnl:0};
+    porHora[h].total++;
+    if (t.resultado==='WIN') porHora[h].wins++;
+    porHora[h].pnl += t.pnl_usd;
+  });
+
+  const pnls = trades.map(t=>t.pnl_usd);
+  const mean = pnls.reduce((a,b)=>a+b,0)/pnls.length;
+  const std  = Math.sqrt(pnls.map(p=>(p-mean)**2).reduce((a,b)=>a+b,0)/pnls.length);
+
+  return {
+    symbol:'BTCUSDT', timeframe:'15m',
+    fecha_inicio:'2024-10-01T00:00:00', fecha_fin:'2024-12-31T23:59:00',
+    capital_inicial: capital0, capital_final: +capital.toFixed(2),
+    total_trades: trades.length,
+    wins: wins.length, losses: losses.length,
+    win_rate: +(wins.length/trades.length*100).toFixed(2),
+    profit_factor: +(wins.reduce((a,t)=>a+t.pnl_usd,0)/Math.abs(losses.reduce((a,t)=>a+t.pnl_usd,0))).toFixed(3),
+    max_drawdown_pct: 12.4, max_drawdown_usd: 124,
+    sharpe_ratio: +(mean/std*Math.sqrt(252)).toFixed(3),
+    avg_win_usd:  +(wins.reduce((a,t)=>a+t.pnl_usd,0)/wins.length).toFixed(2),
+    avg_loss_usd: +(losses.reduce((a,t)=>a+t.pnl_usd,0)/losses.length).toFixed(2),
+    avg_duracion_min: +(trades.reduce((a,t)=>a+t.duracion_min,0)/trades.length).toFixed(1),
+    mejor_trade_usd: +Math.max(...pnls).toFixed(2),
+    peor_trade_usd:  +Math.min(...pnls).toFixed(2),
+    racha_wins: 6, racha_losses: 4,
+    trades, equity_curve: equity,
+    trades_por_sesion: porSesion,
+    trades_por_hora: porHora,
+  };
+}
+
+// ═══════════════════════════════════════════
+//  INICIALIZAR DASHBOARD
+// ═══════════════════════════════════════════
+function inicializar(data) {
+  DATA = data;
+  document.getElementById('upload-zone').style.display = 'none';
+  document.getElementById('dashboard').style.display   = 'block';
+
+  const retPct = ((data.capital_final - data.capital_inicial) / data.capital_inicial * 100).toFixed(2);
+  document.getElementById('header-period').textContent =
+    `${(data.fecha_inicio||'').slice(0,10)} → ${(data.fecha_fin||'').slice(0,10)}`;
+  document.getElementById('footer-info').textContent =
+    `${data.symbol||''} / ${data.timeframe||''} · ${data.total_trades} trades · Retorno: ${retPct >= 0 ? '+' : ''}${retPct}%`;
+
+  try { renderKPIs(data, retPct); } catch(e) { console.error('KPIs:', e); }
+  try { renderEquityChart(data); } catch(e) { console.error('Equity:', e); }
+  try { renderPnlDist(data); } catch(e) { console.error('PnlDist:', e); }
+  try { renderCumulativePnl(data); } catch(e) { console.error('CumPnl:', e); }
+  try { renderHourChart(data); } catch(e) { console.error('Hour:', e); }
+  try { renderMonthChart(data); } catch(e) { console.error('Month:', e); }
+  try { renderSessions(data); } catch(e) { console.error('Sessions:', e); }
+  try { renderTradesTable(data.trades || [], true); } catch(e) { console.error('Trades:', e); }
+}
+
+// ═══════════════════════════════════════════
+//  KPIs
+// ═══════════════════════════════════════════
+function kpiColor(val, thresholds) {
+  if (val >= thresholds.green) return 'kpi-green';
+  if (val >= thresholds.yellow) return 'kpi-yellow';
+  return 'kpi-red';
+}
+
+function renderKPIs(d, retPct) {
+  const retColor = retPct >= 0 ? 'kpi-green' : 'kpi-red';
+  const kpis = [
+    { label:'Capital Final',  value:`$${d.capital_final.toLocaleString('en',{maximumFractionDigits:2})}`, cls: retColor, sub: `Inicial: $${d.capital_inicial.toLocaleString()}` },
+    { label:'Retorno Total',  value:`${retPct >= 0 ? '+' : ''}${retPct}%`, cls: retColor },
+    { label:'Win Rate',       value:`${d.win_rate}%`, cls: kpiColor(d.win_rate,{green:55,yellow:45}), sub:`${d.wins}W / ${d.losses}L` },
+    { label:'Profit Factor',  value:d.profit_factor, cls: kpiColor(d.profit_factor,{green:1.5,yellow:1.0}), sub:'≥1.5 = bueno' },
+    { label:'Total Trades',   value:d.total_trades, cls:'kpi-accent' },
+    { label:'Sharpe Ratio',   value:d.sharpe_ratio, cls: kpiColor(d.sharpe_ratio,{green:1,yellow:0.5}), sub:'anualizado' },
+    { label:'Max Drawdown',   value:`${d.max_drawdown_pct}%`, cls:'kpi-red', sub:`$${(d.max_drawdown_usd||0).toFixed(0)}` },
+    { label:'Avg RR Real',    value:`${(d.avg_rr_real||0).toFixed(1)}R`, cls: kpiColor(d.avg_rr_real||0,{green:2.0,yellow:1.5}), sub:'RR logrado promedio' },
+    { label:'Max R Capturado',value:`${(d.max_r_capturado||0).toFixed(1)}R`, cls:'kpi-accent', sub:'mejor trade en R' },
+    { label:'Avg Win',        value:`$${d.avg_win_usd}`, cls:'kpi-green' },
+    { label:'Avg Loss',       value:`$${d.avg_loss_usd}`, cls:'kpi-red' },
+    { label:'Mejor Trade',    value:`$${d.mejor_trade_usd}`, cls:'kpi-green' },
+    { label:'Peor Trade',     value:`$${d.peor_trade_usd}`, cls:'kpi-red' },
+    { label:'Avg Duración',   value:`${d.avg_duracion_min}m`, cls:'kpi-accent' },
+    { label:'Racha Wins',     value:d.racha_wins, cls:'kpi-green', sub:'consecutivos' },
+    { label:'Racha Losses',   value:d.racha_losses, cls:'kpi-red', sub:'consecutivos' },
+  ];
+  // Agregar perfil y trailing si existen
+  if (d.perfil)        kpis.push({ label:'Perfil',   value:d.perfil, cls:'kpi-accent' });
+  if (d.trailing_mode && d.trailing_mode !== 'none')
+    kpis.push({ label:'Trailing', value:d.trailing_mode, cls:'kpi-accent' });
+  if (d.señales_filtradas)
+    kpis.push({ label:'Filtradas', value:d.señales_filtradas, cls:'kpi-yellow', sub:'por perfil' });
+
+  const grid = document.getElementById('kpi-grid');
+  grid.innerHTML = kpis.map((k,i) => `
+    <div class="kpi" style="animation-delay:${i*0.04}s">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value ${k.cls}">${k.value}</div>
+      ${k.sub ? `<div class="kpi-sub">${k.sub}</div>` : ''}
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════
+//  CHART HELPERS
+// ═══════════════════════════════════════════
+const C = {
+  accent: '#00d4ff', green: '#00e676', red: '#ff3d57',
+  yellow: '#ffd600', purple: '#7c3aed',
+  grid:   'rgba(30,45,61,0.7)',
+  text:   '#4a5568',
+};
+
+function baseChartOpts(title='') {
+  return {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#0d1117',
+        borderColor: '#1e2d3d', borderWidth: 1,
+        titleColor: '#00d4ff', bodyColor: '#c9d1d9',
+        titleFont: { family: 'JetBrains Mono', size: 11 },
+        bodyFont:  { family: 'JetBrains Mono', size: 11 },
+      }
+    },
+    scales: {
+      x: { grid: { color: C.grid }, ticks: { color: C.text, font: { size: 10, family: 'JetBrains Mono' } } },
+      y: { grid: { color: C.grid }, ticks: { color: C.text, font: { size: 10, family: 'JetBrains Mono' } } }
+    }
+  };
+}
+
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+// ═══════════════════════════════════════════
+//  EQUITY CURVE
+// ═══════════════════════════════════════════
+function renderEquityChart(d) {
+  destroyChart('equity');
+  const eq    = d.equity_curve;
+  const step  = Math.max(1, Math.floor(eq.length / 200));
+  const labels = eq.filter((_,i)=>i%step===0).map(e => e.t.slice(0,10));
+  const vals   = eq.filter((_,i)=>i%step===0).map(e => e.v);
+
+  const ctx = document.getElementById('equityChart').getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, 0, 320);
+  grad.addColorStop(0, 'rgba(0,212,255,0.3)');
+  grad.addColorStop(1, 'rgba(0,212,255,0.01)');
+
+  charts.equity = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: vals,
+        borderColor: C.accent, borderWidth: 2,
+        backgroundColor: grad,
+        fill: true, tension: 0.3, pointRadius: 0,
+        pointHoverRadius: 4,
+      }]
+    },
+    options: {
+      ...baseChartOpts(),
+      plugins: {
+        ...baseChartOpts().plugins,
+        tooltip: {
+          ...baseChartOpts().plugins.tooltip,
+          callbacks: { label: ctx => ` $${ctx.parsed.y.toLocaleString('en',{maximumFractionDigits:2})}` }
+        }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════
+//  PnL DISTRIBUTION
+// ═══════════════════════════════════════════
+function renderPnlDist(d) {
+  destroyChart('pnlDist');
+  const pnls = d.trades.map(t => t.pnl_usd);
+  const min  = Math.floor(Math.min(...pnls));
+  const max  = Math.ceil(Math.max(...pnls));
+  const bins = 20;
+  const bw   = (max - min) / bins;
+  const counts = Array(bins).fill(0);
+  pnls.forEach(p => {
+    const b = Math.min(bins-1, Math.floor((p-min)/bw));
+    counts[b]++;
+  });
+  const labels = counts.map((_,i) => `$${(min+i*bw).toFixed(0)}`);
+  const colors = counts.map((_,i) => (min + i*bw) >= 0 ? 'rgba(0,230,118,0.7)' : 'rgba(255,61,87,0.7)');
+
+  charts.pnlDist = new Chart(document.getElementById('pnlDistChart'), {
+    type: 'bar',
+    data: { labels, datasets: [{ data: counts, backgroundColor: colors, borderRadius: 3 }] },
+    options: baseChartOpts()
+  });
+}
+
+// ═══════════════════════════════════════════
+//  CUMULATIVE PnL
+// ═══════════════════════════════════════════
+function renderCumulativePnl(d) {
+  destroyChart('cumPnl');
+  let cum = 0;
+  const labels = d.trades.map(t => `#${t.id}`);
+  const vals   = d.trades.map(t => { cum += t.pnl_usd; return +cum.toFixed(2); });
+  const colors = vals.map((v,i) => {
+    const prev = i===0 ? 0 : vals[i-1];
+    return d.trades[i].resultado === 'WIN' ? C.green : C.red;
+  });
+
+  charts.cumPnl = new Chart(document.getElementById('cumulativePnl'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          type:'line', data: vals, borderColor: C.accent, borderWidth:2,
+          fill:false, tension:0.3, pointRadius:0, yAxisID:'y'
+        },
+        {
+          data: d.trades.map(t=>t.pnl_usd),
+          backgroundColor: colors, borderRadius:2, yAxisID:'y'
+        }
+      ]
+    },
+    options: { ...baseChartOpts(), scales: {
+      x: { display:false },
+      y: { ...baseChartOpts().scales.y }
+    }}
+  });
+}
+
+// ═══════════════════════════════════════════
+//  HOUR CHART
+// ═══════════════════════════════════════════
+function renderHourChart(d) {
+  destroyChart('hour');
+  const labels = [], wrs = [], totals = [];
+  for (let h=0; h<24; h++) {
+    const data = d.trades_por_hora[h.toString()];
+    labels.push(`${String(h).padStart(2,'0')}h`);
+    if (data && data.total > 0) {
+      wrs.push(+(data.wins/data.total*100).toFixed(1));
+      totals.push(data.total);
+    } else {
+      wrs.push(0); totals.push(0);
+    }
+  }
+  charts.hour = new Chart(document.getElementById('hourChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label:'Win Rate %', data: wrs,
+        backgroundColor: wrs.map(w => w >= 55 ? 'rgba(0,230,118,0.7)' : w >= 45 ? 'rgba(255,214,0,0.5)' : 'rgba(255,61,87,0.5)'),
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      ...baseChartOpts(),
+      plugins: {
+        ...baseChartOpts().plugins,
+        tooltip: {
+          ...baseChartOpts().plugins.tooltip,
+          callbacks: {
+            label: ctx => ` WR: ${ctx.parsed.y}% (${totals[ctx.dataIndex]} trades)`
+          }
+        }
+      },
+      scales: {
+        x: { ...baseChartOpts().scales.x },
+        y: { ...baseChartOpts().scales.y, min:0, max:100,
+          ticks: { ...baseChartOpts().scales.y.ticks, callback: v => v+'%' }}
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════
+//  MONTH CHART
+// ═══════════════════════════════════════════
+function renderMonthChart(d) {
+  destroyChart('month');
+  const byMonth = {};
+  d.trades.forEach(t => {
+    const m = t.timestamp_in.slice(0,7);
+    if (!byMonth[m]) byMonth[m] = {wins:0,losses:0};
+    byMonth[m][t.resultado==='WIN'?'wins':'losses']++;
+  });
+  const labels = Object.keys(byMonth).sort();
+  const wins   = labels.map(m => byMonth[m].wins);
+  const losses = labels.map(m => byMonth[m].losses);
+
+  charts.month = new Chart(document.getElementById('monthChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label:'Wins',   data:wins,   backgroundColor:'rgba(0,230,118,0.7)', borderRadius:4 },
+        { label:'Losses', data:losses, backgroundColor:'rgba(255,61,87,0.7)',  borderRadius:4 },
+      ]
+    },
+    options: {
+      ...baseChartOpts(),
+      plugins: { ...baseChartOpts().plugins, legend: { display:true, labels:{ color:C.text, font:{size:11,family:'JetBrains Mono'} } } },
+      scales: { x: baseChartOpts().scales.x, y: { ...baseChartOpts().scales.y, stacked:false } }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════
+//  SESSIONS
+// ═══════════════════════════════════════════
+function renderSessions(d) {
+  const icons = { london:'🇬🇧', new_york:'🇺🇸', asia:'🌏', off:'🌙' };
+  const grid = document.getElementById('session-grid');
+  grid.innerHTML = Object.entries(d.trades_por_sesion).map(([name, data]) => {
+    const wr    = data.total > 0 ? (data.wins/data.total*100).toFixed(1) : 0;
+    const color = wr >= 55 ? 'var(--green)' : wr >= 45 ? 'var(--yellow)' : 'var(--red)';
+    const pnlC  = data.pnl >= 0 ? 'var(--green)' : 'var(--red)';
+    const wrPct = Math.min(100, +wr);
+    return `
+    <div class="session-card">
+      <div class="session-name">${icons[name]||'📊'} ${name.toUpperCase()}</div>
+      <div class="session-wr" style="color:${color}">${wr}%</div>
+      <div class="session-row">
+        <span>Trades: ${data.total}</span>
+        <span style="color:${pnlC}">PnL: $${data.pnl.toFixed(2)}</span>
+      </div>
+      <div class="progress-bar" style="margin-top:10px">
+        <div class="progress-fill" style="width:${wrPct}%;background:${color}"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════
+//  TRADES TABLE
+// ═══════════════════════════════════════════
+var allTrades = [];
+var _originalTrades = [];
+
+function renderTradesTable(trades, isOriginal) {
+  if (isOriginal) {
+    _originalTrades = trades || [];
+    allTrades = _originalTrades;
+  }
+  var displayTrades = trades || [];
+  var countEl = document.getElementById('trade-count');
+  if (countEl) countEl.textContent = displayTrades.length + ' trades';
+  var tbody = document.getElementById('trades-tbody');
+  if (!tbody) return;
+
+  var rows = [];
+  var list = displayTrades.slice(-200).reverse();
+  for (var i = 0; i < list.length; i++) {
+    var t = list[i];
+    var pnlUsd = Number(t.pnl_usd) || 0;
+    var pnlPct = Number(t.pnl_pct) || 0;
+    var pnlC = pnlUsd >= 0 ? 'pnl-pos' : 'pnl-neg';
+    var pnlSign = pnlUsd >= 0 ? '+' : '';
+    var pe = Number(t.precio_entrada) || 0;
+    var ps = Number(t.precio_salida) || 0;
+    var sl = Number(t.stop_loss) || 0;
+    var tp = Number(t.take_profit) || 0;
+    var tam = Number(t.tamaño || t.tamaño_activo) || 0;
+    var dir = String(t.direccion || '—').toUpperCase();
+    var res = String(t.resultado || '—').toUpperCase();
+    var ses = String(t.sesion || '—').toUpperCase();
+    var score = t.score_señal || t.score || '—';
+    var tsIn = String(t.timestamp_in || '').slice(0,16).replace('T',' ');
+    var tsOut = String(t.timestamp_out || '').slice(0,16).replace('T',' ');
+    var dur = Number(t.duracion_min) || 0;
+    var rMax = (t.r_maximo && Number(t.r_maximo) > 0) ? Number(t.r_maximo).toFixed(1) + 'R' : '—';
+    var dirClass = dir === 'LONG' ? 'long' : dir === 'SHORT' ? 'short' : 'sesion';
+    var resClass = res === 'WIN' ? 'win' : res === 'LOSS' ? 'loss' : 'sesion';
+    var tpStr = tp > 0 ? '$' + tp.toFixed(2) : 'trailing';
+
+    rows.push('<tr>'
+      + '<td style="color:var(--muted)">' + (t.id || '—') + '</td>'
+      + '<td>' + tsIn + '</td>'
+      + '<td>' + tsOut + '</td>'
+      + '<td><span class="badge badge-' + dirClass + '">' + dir + '</span></td>'
+      + '<td>$' + pe.toFixed(2) + '</td>'
+      + '<td>$' + ps.toFixed(2) + '</td>'
+      + '<td style="color:var(--red)">$' + sl.toFixed(2) + '</td>'
+      + '<td style="color:var(--green)">' + tpStr + '</td>'
+      + '<td style="color:var(--muted)">' + tam.toFixed(4) + '</td>'
+      + '<td class="' + pnlC + '">' + pnlSign + '$' + pnlUsd.toFixed(2) + '</td>'
+      + '<td class="' + pnlC + '">' + pnlSign + pnlPct.toFixed(2) + '%</td>'
+      + '<td style="color:var(--muted)">' + dur + 'm</td>'
+      + '<td><span class="badge badge-sesion">' + ses + '</span></td>'
+      + '<td style="color:var(--yellow)">' + score + '</td>'
+      + '<td style="color:var(--accent)">' + rMax + '</td>'
+      + '<td><span class="badge badge-' + resClass + '">' + res + '</span></td>'
+      + '</tr>');
+  }
+  tbody.innerHTML = rows.join('');
+}
+
+function filtrarTrades(filtro, btn) {
+  var tabs = document.querySelectorAll('.filter-tab');
+  for (var i = 0; i < tabs.length; i++) { tabs[i].classList.remove('active'); }
+  btn.classList.add('active');
+  if (filtro === 'all') return renderTradesTable(_originalTrades);
+  var filtered = [];
+  for (var j = 0; j < _originalTrades.length; j++) {
+    var t = _originalTrades[j];
+    if (filtro === 'WIN' || filtro === 'LOSS') {
+      if (String(t.resultado||'').toUpperCase() === filtro) filtered.push(t);
+    } else {
+      if (String(t.direccion||'').toUpperCase() === filtro) filtered.push(t);
+    }
+  }
+  return renderTradesTable(filtered);
+}
+
+// ═══════════════════════════════════════════
+//  COMPARACIÓN DE PERFILES
+// ═══════════════════════════════════════════
+function inicializarComparacion(perfiles) {
+  document.getElementById('upload-zone').style.display = 'none';
+  document.getElementById('dashboard').style.display   = 'block';
+
+  // Usar el primer perfil para los charts principales
+  const best = perfiles.reduce((a, b) =>
+    (b.capital_final - b.capital_inicial) > (a.capital_final - a.capital_inicial) ? b : a
+  );
+  inicializar(best);
+
+  // Agregar tabla de comparación al inicio del dashboard
+  const dashEl = document.getElementById('dashboard');
+  const compDiv = document.createElement('div');
+  compDiv.className = 'card';
+  compDiv.style.marginBottom = '24px';
+
+  let html = `<div class="card-header">
+    <span class="card-icon">📊</span>
+    <span>Comparación de ${perfiles.length} configuraciones</span>
+  </div>
+  <div style="overflow-x:auto">
+  <table><thead><tr>
+    <th>Config</th><th>Trailing</th><th>Trades</th><th>WR</th>
+    <th>PF</th><th>Retorno</th><th>DD</th><th>Avg RR</th><th>Max R</th>
+    <th>Avg Win</th><th>Avg Loss</th>
+  </tr></thead><tbody>`;
+
+  // Ordenar por retorno
+  const sorted = [...perfiles].sort((a,b) =>
+    (b.capital_final-b.capital_inicial)/b.capital_inicial -
+    (a.capital_final-a.capital_inicial)/a.capital_inicial
+  );
+
+  sorted.forEach((p, i) => {
+    const ret = ((p.capital_final - p.capital_inicial) / p.capital_inicial * 100).toFixed(2);
+    const retC = +ret >= 0 ? 'pnl-pos' : 'pnl-neg';
+    const isBest = i === 0 ? 'style="background:rgba(0,212,255,0.08)"' : '';
+    const label = `${p.symbol||''}/${p.timeframe||''} ${p.perfil||''}`;
+    html += `<tr ${isBest}>
+      <td>${label}</td>
+      <td>${p.trailing_mode || 'none'}</td>
+      <td>${p.total_trades}</td>
+      <td>${p.win_rate}%</td>
+      <td>${p.profit_factor}</td>
+      <td class="${retC}">${+ret>=0?'+':''}${ret}%</td>
+      <td>${p.max_drawdown_pct}%</td>
+      <td>${(p.avg_rr_real||0).toFixed(1)}R</td>
+      <td>${(p.max_r_capturado||0).toFixed(1)}R</td>
+      <td style="color:var(--green)">$${(p.avg_win_usd||0).toFixed(2)}</td>
+      <td style="color:var(--red)">$${(p.avg_loss_usd||0).toFixed(2)}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table></div>';
+  compDiv.innerHTML = html;
+  dashEl.insertBefore(compDiv, dashEl.firstChild);
 }
 </script>
 </body>
