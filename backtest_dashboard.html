@@ -382,6 +382,13 @@
   <!-- DASHBOARD -->
   <div id="dashboard">
 
+    <!-- FILE BANNER -->
+    <div id="file-banner" style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;">
+      <button onclick="volverAlUpload()" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;">← Volver</button>
+      <span style="font-size:12px;color:var(--muted);">Archivo:</span>
+      <span id="file-name" style="font-size:12px;color:var(--text);font-weight:600;"></span>
+    </div>
+
     <!-- KPIs -->
     <div class="section-title">📈 Resumen de Performance</div>
     <div class="kpi-grid" id="kpi-grid"></div>
@@ -505,18 +512,17 @@ zone.addEventListener('drop', e => {
 
 function cargarArchivo(e) {
   const file = e.target.files[0];
-  if (file) leerJSON(file);
+  if (file) leerJSON(file, file.name);
 }
-function leerJSON(file) {
+function leerJSON(file, nombre) {
   const r = new FileReader();
   r.onload = ev => {
     try {
       const raw = JSON.parse(ev.target.result);
-      // Detectar formato comparación
       if (raw.comparacion && raw.perfiles) {
         inicializarComparacion(raw.perfiles);
       } else {
-        inicializar(raw);
+        inicializar(raw, nombre || 'backtest');
       }
     } catch(e) {
       alert('Error al leer JSON: ' + e.message);
@@ -626,11 +632,13 @@ function generarDemo() {
 // ═══════════════════════════════════════════
 //  INICIALIZAR DASHBOARD
 // ═══════════════════════════════════════════
-function inicializar(data) {
+function inicializar(data, filename) {
   DATA = data;
   window._lastData = data;
+  window._lastFilename = filename || '';
   document.getElementById('upload-zone').style.display = 'none';
   document.getElementById('dashboard').style.display   = 'block';
+  document.getElementById('file-name').textContent = filename || '';
 
   const retPct = ((data.capital_final - data.capital_inicial) / data.capital_inicial * 100).toFixed(2);
   document.getElementById('header-period').textContent =
@@ -639,6 +647,14 @@ function inicializar(data) {
     `${data.symbol||''} / ${data.timeframe||''} · ${data.total_trades} trades · Retorno: ${retPct >= 0 ? '+' : ''}${retPct}%`;
 
   renderAllCharts(data);
+}
+
+function volverAlUpload() {
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('upload-zone').style.display = '';
+  document.getElementById('file-input').value = '';
+  // Destruir charts
+  Object.keys(charts).forEach(function(k) { if (charts[k]) { charts[k].destroy(); delete charts[k]; } });
 }
 
 function renderAllCharts(data) {
@@ -662,6 +678,18 @@ function kpiColor(val, thresholds) {
   return 'kpi-red';
 }
 
+function formatDuration(mins) {
+  mins = Math.round(mins);
+  if (mins < 60) return mins + 'm';
+  var h = Math.floor(mins / 60);
+  var m = mins % 60;
+  if (h < 24) return m > 0 ? h + 'h ' + m + 'm' : h + 'h';
+  var d = Math.floor(h / 24);
+  h = h % 24;
+  if (h > 0) return d + 'd ' + h + 'h';
+  return d + 'd';
+}
+
 function renderKPIs(d, retPct) {
   const retColor = retPct >= 0 ? 'kpi-green' : 'kpi-red';
   const kpis = [
@@ -678,7 +706,7 @@ function renderKPIs(d, retPct) {
     { label:'Avg Loss',       value:`$${d.avg_loss_usd}`, cls:'kpi-red' },
     { label:'Mejor Trade',    value:`$${d.mejor_trade_usd}`, cls:'kpi-green' },
     { label:'Peor Trade',     value:`$${d.peor_trade_usd}`, cls:'kpi-red' },
-    { label:'Avg Duración',   value:`${d.avg_duracion_min}m`, cls:'kpi-accent' },
+    { label:'Avg Duración',   value:formatDuration(d.avg_duracion_min), cls:'kpi-accent' },
     { label:'Racha Wins',     value:d.racha_wins, cls:'kpi-green', sub:'consecutivos' },
     { label:'Racha Losses',   value:d.racha_losses, cls:'kpi-red', sub:'consecutivos' },
   ];
@@ -1006,7 +1034,7 @@ function renderTradesTable(trades, isOriginal) {
       + '<td style="color:var(--muted)">' + tam.toFixed(4) + '</td>'
       + '<td class="' + pnlC + '">' + pnlSign + '$' + pnlUsd.toFixed(2) + '</td>'
       + '<td class="' + pnlC + '">' + pnlSign + pnlPct.toFixed(2) + '%</td>'
-      + '<td style="color:var(--muted)">' + dur + 'm</td>'
+      + '<td style="color:var(--muted)">' + formatDuration(dur) + '</td>'
       + '<td><span class="badge badge-sesion">' + ses + '</span></td>'
       + '<td style="color:var(--yellow)">' + score + '</td>'
       + '<td style="color:var(--accent)">' + rMax + '</td>'
