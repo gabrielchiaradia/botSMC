@@ -95,8 +95,7 @@ class GridBot:
         self.total_profit = 0.0
         self.total_trades = 0
         self.initial_capital = cfg.CAPITAL
-        self.current_capital = cfg.CAPITAL
-        self.invested = 0.0  # USDT invertido en posiciones
+        self.usdt_free = cfg.CAPITAL   # USDT disponible para comprar
         self.running = True
         self.start_time = datetime.now()
 
@@ -272,15 +271,18 @@ class GridBot:
                     ejecutada = precio_actual <= level.price
 
                 if ejecutada:
+                    cost = level.price * self.qty_per_level
+                    # Verificar que hay capital suficiente
+                    if cost > self.usdt_free:
+                        level.buy_order_id = None  # Cancelar, no hay plata
+                        continue
                     level.has_position = True
                     level.qty = self.qty_per_level
                     level.buy_order_id = None
-                    cost = level.price * level.qty
-                    self.invested += cost
-                    self.current_capital -= cost
+                    self.usdt_free -= cost
 
-                    logger.info("✅ COMPRA ejecutada: $%.2f x %.4f = $%.2f",
-                               level.price, level.qty, cost)
+                    logger.info("✅ COMPRA ejecutada: $%.2f x %.4f = $%.2f (USDT libre: $%.2f)",
+                               level.price, level.qty, cost, self.usdt_free)
 
                     # Colocar venta un nivel arriba
                     next_idx = level.index + 1
@@ -316,14 +318,13 @@ class GridBot:
                             revenue = level.price * buy_level.qty
                             self.total_profit += profit
                             self.total_trades += 1
-                            self.current_capital += revenue
-                            self.invested -= buy_level.price * buy_level.qty
+                            self.usdt_free += revenue  # Recibimos USDT de la venta
 
                             buy_level.has_position = False
                             buy_level.qty = 0.0
 
-                            logger.info("💰 VENTA ejecutada: $%.2f | Profit: $%.4f | Total: $%.4f (%d trades)",
-                                       level.price, profit, self.total_profit, self.total_trades)
+                            logger.info("💰 VENTA ejecutada: $%.2f | Profit: $%.4f | Total: $%.4f | USDT: $%.2f (%d trades)",
+                                       level.price, profit, self.total_profit, self.usdt_free, self.total_trades)
 
                     level.sell_order_id = None
 
@@ -344,21 +345,20 @@ class GridBot:
             return True
         return False
 
-    def verificar_max_loss(self) -> bool:
+    def verificar_max_loss(self, precio_actual: float) -> bool:
         """Retorna True si la pérdida supera el máximo."""
-        # Calcular PnL unrealized
-        unrealized = 0.0
-        precio = self._get_precio_actual() if self.client else 0
-        for level in self.levels:
-            if level.has_position:
-                unrealized += (precio - level.price) * level.qty
-
-        total_pnl = self.total_profit + unrealized
-        if total_pnl < -self.cfg.MAX_LOSS_USD:
-            logger.warning("⛔ MAX LOSS alcanzado: PnL $%.2f < -$%.2f",
-                          total_pnl, self.cfg.MAX_LOSS_USD)
+        equity = self.calcular_equity(precio_actual)
+        loss = self.initial_capital - equity
+        if loss > self.cfg.MAX_LOSS_USD:
+            logger.warning("⛔ MAX LOSS alcanzado: perdida $%.2f > $%.2f",
+                          loss, self.cfg.MAX_LOSS_USD)
             return True
         return False
+
+    def calcular_equity(self, precio_actual: float) -> float:
+        """Equity total = USDT libre + valor de ETH en posiciones al precio actual."""
+        valor_holdings = sum(precio_actual * l.qty for l in self.levels if l.has_position)
+        return self.usdt_free + valor_holdings
 
     def verificar_reposition(self, precio_actual: float) -> bool:
         """Retorna True si hay que reposicionar el grid hacia arriba."""
@@ -380,10 +380,10 @@ class GridBot:
 
     def cerrar_todo(self, precio_actual: float):
         """Cierra todas las posiciones y cancela órdenes."""
-        logger.info("Cerrando todas las posiciones...")
+        logger.info("Cerrando todas las posiciones al precio $%.2f...", precio_actual)
         self._cancelar_todas_ordenes()
 
-        # Vender todo lo que esté comprado
+        # Vender todo lo que esté comprado al precio actual
         for level in self.levels:
             if level.has_position and level.qty > 0:
                 if self.live and self.client:
@@ -397,7 +397,9 @@ class GridBot:
                     except Exception as e:
                         logger.error("Error vendiendo posición en $%.2f: %s", level.price, e)
 
+                revenue = precio_actual * level.qty
                 pnl = (precio_actual - level.price) * level.qty
+                self.usdt_free += revenue
                 self.total_profit += pnl
                 logger.info("Cerrado nivel $%.2f → $%.2f | PnL: $%.4f",
                            level.price, precio_actual, pnl)
@@ -413,9 +415,8 @@ class GridBot:
         ordenes_buy = sum(1 for l in self.levels if l.buy_order_id)
         ordenes_sell = sum(1 for l in self.levels if l.sell_order_id)
 
-        unrealized = sum((precio_actual - l.price) * l.qty
-                        for l in self.levels if l.has_position)
-
+        equity = self.calcular_equity(precio_actual)
+        valor_holdings = sum(precio_actual * l.qty for l in self.levels if l.has_position)
         elapsed = (datetime.now() - self.start_time).total_seconds() / 3600
 
         return {
@@ -426,9 +427,11 @@ class GridBot:
             "posiciones": posiciones_abiertas,
             "ordenes_buy": ordenes_buy,
             "ordenes_sell": ordenes_sell,
+            "usdt_free": round(self.usdt_free, 4),
+            "valor_holdings": round(valor_holdings, 4),
+            "equity": round(equity, 4),
             "profit_realizado": round(self.total_profit, 4),
-            "profit_unrealized": round(unrealized, 4),
-            "profit_total": round(self.total_profit + unrealized, 4),
+            "retorno_pct": round((equity - self.initial_capital) / self.initial_capital * 100, 2),
             "trades": self.total_trades,
             "horas": round(elapsed, 1),
             "capital_inicial": self.initial_capital,
@@ -586,14 +589,13 @@ def run_grid_backtest(cfg: GridConfig, dias: int, auto_range: bool = True):
         # Después verificar ventas (precio subió al nivel)
         bot.verificar_ejecuciones(high)
 
-        # Track invested
-        invested_now = sum(l.price * l.qty for l in bot.levels if l.has_position)
-        max_invested = max(max_invested, invested_now)
-
-        # Equity: capital libre + valor de posiciones al cierre
-        unrealized = sum((close - l.price) * l.qty for l in bot.levels if l.has_position)
-        equity_total = bot.current_capital + invested_now + unrealized
+        # Equity = USDT libre + valor holdings al cierre
+        equity_total = bot.calcular_equity(close)
         equity_curve.append({"t": str(df.index[i]), "v": round(equity_total, 2)})
+
+        # Track max invested
+        valor_holdings = sum(close * l.qty for l in bot.levels if l.has_position)
+        max_invested = max(max_invested, valor_holdings)
 
         # Log de trades nuevos
         if bot.total_trades > trades_antes:
@@ -609,7 +611,7 @@ def run_grid_backtest(cfg: GridConfig, dias: int, auto_range: bool = True):
         if bot.verificar_stop_loss(low):
             bot.cerrar_todo(close)
             stopped = True
-            equity_curve.append({"t": str(df.index[i]), "v": round(bot.current_capital, 2)})
+            equity_curve.append({"t": str(df.index[i]), "v": round(bot.usdt_free, 2)})
             break
 
         # Verificar reposición
@@ -624,7 +626,7 @@ def run_grid_backtest(cfg: GridConfig, dias: int, auto_range: bool = True):
     # ── Resultados ─────────────────────────────────────────
     precio_final = df["close"].iloc[-1]
     resumen = bot.resumen(precio_final)
-    capital_final = bot.current_capital + bot.total_profit
+    capital_final = bot.usdt_free  # After cerrar_todo, all is USDT
     ret_pct = (capital_final - cfg.CAPITAL) / cfg.CAPITAL * 100
 
     # Max drawdown
@@ -643,14 +645,14 @@ def run_grid_backtest(cfg: GridConfig, dias: int, auto_range: bool = True):
     print(f"{'═'*60}")
     print(f"  Par:              {cfg.SYMBOL}")
     print(f"  Período:          {df.index[0].date()} → {df.index[-1].date()}")
-    print(f"  Rango Grid:       ${cfg.LOWER:,.2f} — ${cfg.UPPER:,.2f} ({cfg.COUNT} niveles)")
+    print(f"  Rango Grid:       ${cfg.LOWER:,.2f} — ${cfg.UPPER:,.2f} ({cfg.COUNT} niveles, step ${bot.step:,.2f})")
     print(f"  Precio:           ${precio_inicio:,.2f} → ${precio_final:,.2f}")
     print(f"  Capital:          ${cfg.CAPITAL:,.2f} → ${capital_final:,.2f}")
     print(f"  Retorno:          {ret_pct:+.2f}%")
     print(f"  Trades:           {bot.total_trades}")
-    print(f"  Profit realizado: ${bot.total_profit:+,.4f}")
+    print(f"  Profit grid:      ${bot.total_profit:+,.4f}")
     print(f"  Max Drawdown:     {max_dd:.2f}%")
-    print(f"  Max invertido:    ${max_invested:,.2f}")
+    print(f"  Max en holdings:  ${max_invested:,.2f}")
     if stopped:
         print(f"  ⛔ Stop Loss activado durante el backtest")
     print(f"{'═'*60}")
@@ -826,18 +828,18 @@ def main():
                 notifier._enviar(
                     f"⛔ *Grid Bot — STOP LOSS*\n"
                     f"Precio: `${precio:,.2f}`\n"
-                    f"Profit: `${resumen['profit_total']:+,.4f} USDT`\n"
+                    f"Equity: `${resumen['equity']:,.2f} USDT`\n"
                     f"Trades: `{resumen['trades']}`"
                 )
                 break
 
             # Verificar max loss
-            if bot.verificar_max_loss():
+            if bot.verificar_max_loss(precio):
                 bot.cerrar_todo(precio)
                 resumen = bot.resumen(precio)
                 notifier._enviar(
                     f"⛔ *Grid Bot — MAX LOSS*\n"
-                    f"Profit: `${resumen['profit_total']:+,.4f} USDT`\n"
+                    f"Equity: `${resumen['equity']:,.2f} USDT`\n"
                     f"Trades: `{resumen['trades']}`"
                 )
                 break
@@ -862,9 +864,9 @@ def main():
                 resumen = bot.resumen(precio)
                 logger.info(
                     "Grid | $%.2f | Pos: %d | Buy: %d | Sell: %d | "
-                    "Profit: $%.4f | Trades: %d",
+                    "Equity: $%.2f | Trades: %d",
                     precio, resumen["posiciones"], resumen["ordenes_buy"],
-                    resumen["ordenes_sell"], resumen["profit_total"],
+                    resumen["ordenes_sell"], resumen["equity"],
                     resumen["trades"]
                 )
                 last_summary = time.time()
@@ -881,7 +883,8 @@ def main():
     print(f"{'='*52}")
     print(f"  Trades completados: {resumen['trades']}")
     print(f"  Profit realizado:   ${resumen['profit_realizado']:+,.4f}")
-    print(f"  Profit total:       ${resumen['profit_total']:+,.4f}")
+    print(f"  Equity final:       ${resumen['equity']:,.2f}")
+    print(f"  Retorno:            {resumen['retorno_pct']:+.2f}%")
     print(f"  Duración:           {resumen['horas']:.1f} horas")
     print(f"{'='*52}\n")
 
@@ -889,7 +892,8 @@ def main():
         f"🔴 *Grid Bot Detenido*\n"
         f"{'─'*28}\n"
         f"Trades: `{resumen['trades']}`\n"
-        f"Profit: `${resumen['profit_total']:+,.4f} USDT`\n"
+        f"Equity: `${resumen['equity']:,.2f} USDT`\n"
+        f"Retorno: `{resumen['retorno_pct']:+.2f}%`\n"
         f"Duración: `{resumen['horas']:.1f}h`\n"
         f"🕐 `{datetime.now().strftime('%Y-%m-%d %H:%M')} Local`"
     )
