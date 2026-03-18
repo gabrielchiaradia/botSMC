@@ -1,0 +1,28 @@
+# Interactive backtest run 20260318_130539
+# 26 resultados
+C:\Users\Gabriel\Downloads\smc-bot-improved\backtest\results\bt_bnbusdt_15m_base_none_360d_mt3_rr1.5.json
+C:\Users\Gabriel\Downloads\smc-bot-improved\backtest\results\bt_bnbusdt_15m_base_none_360d_mt3_w13-16_rr1.5.json
+C:\Users\Gabriel\Downloads\smc-bot-improved\backtest\results\bt_bnbusdt_15m_ob_bos_none_360d_mt3_rr1.5.json
+C:\Users\Gabriel\Downloads\smc-bot-improved\backtest\results\bt_bnbusdt_15m_ob_bos_none_360d_mt3_w13-16_rr1.5.json
+C:\Users\Gabriel\Downloads\smc-bot-improved\backtest\results\bt_bnbusdt_1h_base_none_360d_mt3_rr1.5.json
+C:\Users\Gabriel\Downloads\smc-bot-improved\backtest\results\bt_bnbusdt_1h_base_none_360d_mt3_w13-16_rr1.5.json
+C:\Users\Gabriel\Downloads\smc-bot-improved\backtest\results\bt_bnbusdt_1h_ob_bos_none_360d_mt3_rr1.5.json
+C:\Users\Gabriel\Downloads\smc-bot-improved\backtest\results\bt_bnbusdt_1h_ob_bos_none_360d_mt3_w13-16_rr1.5.json
+C:\Users\Gabriel\Downloads\smc-bot-improved\backtest\results\bt_ethusdt_15m_base_none_360d_mt3_w11-18_rr2.5.json
+C:\Users\Gabriel\Downloads\smc-bot-improved\backtest\results\bt_ethusdt_15m_ob_bos_none_360d_mt3_w11-18_rr2.5.json
+C:\Users\Gabriel\Downloads\smc-bot-improved\backtest\results\bt_solusdt_15m_base_none_360d_mt3_rr1.5.json
+C:\Users\Gabriel\Downloads\smc-bot-improved\backtest\results\bt_solusdt_15m_base_none_360d_mt3_w13-16_rr1.5.json
+C:\Users\Gabriel\Downloads\smc-bot-improved\backtest\results\bt_solusdt_15m_ob_bos_none_360d_mt3_rr1.5.json
+C:\Users\Gabriel\Downloads\smc-bot-improved\backtest\results\bt_solusdt_15m_ob_bos_none_360d_mt3_w13-16_rr1.5.json
+C:\Users\Gabriel\Downloads\smc-bot-improved\backtest\results\bt_solusdt_1h_base_none_360d_mt3_rr1.5.json
+C:\Users\Gabriel\Downloads\smc-bot-improved\backtest\results\bt_solusdt_1h_base_none_360d_mt3_w13-16_rr1.5.json
+C:\Users\Gabriel\Downloads\smc-bot-improved\backtest\results\bt_solusdt_1h_ob_bos_none_360d_mt3_rr1.5.json
+C:\Users\Gabriel\Downloads\smc-bot-improved\backtest\results\bt_solusdt_1h_ob_bos_none_360d_mt3_w13-16_rr1.5.json
+C:\Users\Gabriel\Downloads\smc-bot-improved\backtest\results\bt_xrpusdt_15m_base_none_360d_mt3_rr1.5.json
+C:\Users\Gabriel\Downloads\smc-bot-improved\backtest\results\bt_xrpusdt_15m_base_none_360d_mt3_w13-16_rr1.5.json
+C:\Users\Gabriel\Downloads\smc-bot-improved\backtest\results\bt_xrpusdt_15m_ob_bos_none_360d_mt3_rr1.5.json
+C:\Users\Gabriel\Downloads\smc-bot-improved\backtest\results\bt_xrpusdt_15m_ob_bos_none_360d_mt3_w13-16_rr1.5.json
+C:\Users\Gabriel\Downloads\smc-bot-improved\backtest\results\bt_xrpusdt_1h_base_none_360d_mt3_rr1.5.json
+C:\Users\Gabriel\Downloads\smc-bot-improved\backtest\results\bt_xrpusdt_1h_base_none_360d_mt3_w13-16_rr1.5.json
+C:\Users\Gabriel\Downloads\smc-bot-improved\backtest\results\bt_xrpusdt_1h_ob_bos_none_360d_mt3_rr1.5.json
+C:\Users\Gabriel\Downloads\smc-bot-improved\backtest\results\bt_xrpusdt_1h_ob_bos_none_360d_mt3_w13-16_rr1.5.json
