@@ -12,7 +12,9 @@ Uso:
 import subprocess
 import sys
 import os
+import json
 from pathlib import Path
+from datetime import datetime
 from itertools import product
 
 # Colores
@@ -76,7 +78,7 @@ def ask_yn(prompt, default="s"):
 
 
 def build_command(symbol, timeframe, dias, capital, strategy, trailing,
-                  max_trades, windows, rr, score):
+                  max_trades, windows, rr, score, ob_max_age=None):
     """Construye el comando de backtest."""
     cmd = [
         sys.executable, "scripts/run_backtest.py",
@@ -94,6 +96,8 @@ def build_command(symbol, timeframe, dias, capital, strategy, trailing,
         cmd.extend(["--rr", str(rr)])
     if score is not None:
         cmd.extend(["--score", str(score)])
+    if ob_max_age is not None:
+        cmd.extend(["--ob-max-age", str(ob_max_age)])
     return cmd
 
 
@@ -105,6 +109,107 @@ def format_combo(i, total, symbol, tf, strategy, trailing, rr, windows):
     if windows is not None:
         parts.append(f"w:{windows}" if windows else "24h")
     return f"[{i}/{total}] {' · '.join(parts)}"
+
+
+def exportar_excel(archivos, excel_path):
+    """Genera un Excel con los resultados de todos los backtests."""
+    import re
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    except ImportError:
+        raise ImportError("Instalá openpyxl: pip install openpyxl")
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Backtests"
+
+    # Headers
+    headers = ["Symbol", "TF", "Strategy", "Trailing", "Windows", "Días",
+               "RR", "Retorno %", "Trades", "Win Rate %", "Profit Factor",
+               "Max DD %", "Sharpe", "Avg Win", "Avg Loss", "Avg RR",
+               "Cap Inicial", "Cap Final", "Archivo"]
+
+    header_font = Font(bold=True, color="FFFFFF", size=10)
+    header_fill = PatternFill(start_color="1F2937", end_color="1F2937", fill_type="solid")
+    thin_border = Border(
+        bottom=Side(style='thin', color='D1D5DB')
+    )
+
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center')
+
+    # Datos
+    green_font = Font(color="16A34A")
+    red_font = Font(color="DC2626")
+
+    def extraer_windows(nombre):
+        m = re.search(r'_w(\d+-\d+(?:_\d+-\d+)*)', nombre)
+        return m.group(1).replace('_', ',') if m else "24h"
+
+    row = 2
+    for path in archivos:
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            continue
+
+        if data.get("comparacion"):
+            continue  # saltar systematic
+
+        cap_ini = data.get("capital_inicial", 0)
+        cap_fin = data.get("capital_final", 0)
+        ret = (cap_fin - cap_ini) / cap_ini * 100 if cap_ini else 0
+        nombre = Path(path).stem
+
+        valores = [
+            data.get("symbol", "?"),
+            data.get("timeframe", "?"),
+            data.get("perfil", "?"),
+            data.get("trailing_mode", "none"),
+            extraer_windows(nombre),
+            data.get("dias", "?"),
+            data.get("tp_rr_ratio", "?"),
+            round(ret, 2),
+            data.get("total_trades", 0),
+            data.get("win_rate", 0),
+            data.get("profit_factor", 0),
+            data.get("max_drawdown_pct", 0),
+            data.get("sharpe_ratio", 0),
+            data.get("avg_win_usd", 0),
+            data.get("avg_loss_usd", 0),
+            data.get("avg_rr_real", 0),
+            cap_ini,
+            round(cap_fin, 2),
+            Path(path).name,
+        ]
+
+        for col, val in enumerate(valores, 1):
+            cell = ws.cell(row=row, column=col, value=val)
+            cell.border = thin_border
+            # Colorear retorno
+            if col == 8:
+                cell.font = green_font if val >= 0 else red_font
+                cell.number_format = '+0.00%;-0.00%'
+            # Colorear PF
+            if col == 11:
+                cell.font = green_font if val >= 1.3 else red_font
+
+        row += 1
+
+    # Auto-ajustar anchos
+    for col in ws.columns:
+        max_len = max(len(str(cell.value or "")) for cell in col)
+        ws.column_dimensions[col[0].column_letter].width = min(max_len + 3, 30)
+
+    # Filtros automáticos
+    ws.auto_filter.ref = f"A1:{chr(64+len(headers))}{row-1}"
+
+    wb.save(excel_path)
 
 
 def main():
@@ -168,10 +273,18 @@ def main():
         score_list = ask("Score mínimo", default="50",
                           multi=True, tipo=int)
 
+    # OB Max Age (solo aplica a ob_bos)
+    ob_age_list = [None]
+    if any(s in ("ob_bos", "ob_bos_ema") for s in strategies):
+        use_age = ask_yn("¿Definir edad máxima del OB en velas? (solo ob_bos)", default="n")
+        if use_age:
+            ob_age_list = ask("OB max age (velas)", default="25",
+                               multi=True, tipo=int)
+
     # ── Calcular combinaciones ─────────────────────────────
     combos = list(product(
         symbols, timeframes, dias_list, strategies, trailings,
-        max_trades_list, windows_list, rr_list, score_list
+        max_trades_list, windows_list, rr_list, score_list, ob_age_list
     ))
 
     print(f"\n{'─'*60}")
@@ -202,13 +315,13 @@ def main():
     # Snapshot de archivos antes de empezar
     archivos_antes = set(results_dir.glob("*.json")) if results_dir.exists() else set()
 
-    for i, (sym, tf, dias, strat, trail, mt, win, rr, sc) in enumerate(combos, 1):
+    for i, (sym, tf, dias, strat, trail, mt, win, rr, sc, age) in enumerate(combos, 1):
         desc = format_combo(i, len(combos), sym, tf, strat, trail, rr, win)
         print(f"\n{'═'*60}")
         print(f"  {GREEN}{desc}{RESET}")
         print(f"{'═'*60}")
 
-        cmd = build_command(sym, tf, dias, capital, strat, trail, mt, win, rr, sc)
+        cmd = build_command(sym, tf, dias, capital, strat, trail, mt, win, rr, sc, age)
 
         try:
             result = subprocess.run(
@@ -231,6 +344,20 @@ def main():
     archivos_despues = set(results_dir.glob("*.json")) if results_dir.exists() else set()
     archivos_nuevos = sorted(archivos_despues - archivos_antes)
 
+    # ── Guardar manifest con lista de archivos ─────────────
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    manifest_path = results_dir / f"_run_{timestamp}.txt"
+    if archivos_nuevos:
+        try:
+            with open(manifest_path, "w", encoding="utf-8") as f:
+                f.write(f"# Interactive backtest run {timestamp}\n")
+                f.write(f"# {len(archivos_nuevos)} resultados\n")
+                for a in archivos_nuevos:
+                    f.write(f"{a}\n")
+            print(f"  {CYAN}Manifest: {manifest_path.name}{RESET}")
+        except OSError:
+            pass
+
     # ── Resumen final ──────────────────────────────────────
     print(f"\n\n{'═'*60}")
     print(f"{BOLD}{'  RESUMEN FINAL':^60}{RESET}")
@@ -250,8 +377,9 @@ def main():
         try:
             compare_cmd = [
                 sys.executable, "scripts/compare_results.py",
+                "--from-file", str(manifest_path),
                 "--sort", "pf",
-            ] + [str(f) for f in archivos_nuevos]
+            ]
             subprocess.run(
                 compare_cmd,
                 cwd=str(Path(__file__).resolve().parents[1]),
@@ -261,7 +389,18 @@ def main():
     elif len(archivos_nuevos) == 1:
         print(f"\n  Resultado: {archivos_nuevos[0].name}")
 
+    # ── Exportar Excel ─────────────────────────────────────
+    if len(archivos_nuevos) >= 1:
+        excel_path = results_dir / f"_run_{timestamp}.xlsx"
+        try:
+            exportar_excel(archivos_nuevos, excel_path)
+            print(f"\n  {GREEN}Excel exportado: {excel_path.name}{RESET}")
+        except Exception as e:
+            print(f"  {YELLOW}⚠ No se pudo exportar Excel: {e}{RESET}")
+            print(f"  {DIM}Tip: pip install openpyxl{RESET}")
+
     print(f"\n  Los resultados están en backtest/results/")
+    print(f"  Para re-comparar: python scripts/compare_results.py --from-file {manifest_path.name}")
     print(f"  Abrí el dashboard para visualizarlos.\n")
 
 

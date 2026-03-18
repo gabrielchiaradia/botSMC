@@ -93,6 +93,8 @@ Ejemplos:
                    help="Score mínimo (override .env)")
     p.add_argument("--rr",            type=float, default=None,
                    help="TP/RR ratio (override .env). Ej: 2.0, 3.0")
+    p.add_argument("--ob-max-age",    type=int, default=None,
+                   help="Edad máxima del OB en velas (solo ob_bos). 0=sin límite. Ej: 20, 25, 30")
     p.add_argument("--output",        default=None,
                    help="Nombre del archivo de salida JSON")
     args = p.parse_args()
@@ -106,6 +108,9 @@ Ejemplos:
         _strat.SCORE_MINIMO = args.score
     if args.rr is not None:
         _risk.TP_RR_RATIO = args.rr
+    if args.ob_max_age is not None:
+        import os
+        os.environ["OB_MAX_AGE"] = str(args.ob_max_age)
 
     return args
 
@@ -375,6 +380,8 @@ def main():
                 parts.append(f"rr{args.rr}")
             if args.score:
                 parts.append(f"sc{args.score}")
+            if args.ob_max_age:
+                parts.append(f"age{args.ob_max_age}")
             output = "_".join(parts) + ".json"
         path   = exportar_json(stats, output)
         print(f"\n  JSON exportado: {path}")

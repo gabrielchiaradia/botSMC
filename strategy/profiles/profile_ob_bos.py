@@ -19,6 +19,7 @@ la calidad de los OBs que sí pasan.
 """
 
 from __future__ import annotations
+import os
 import pandas as pd
 
 from strategy.profiles.base_profile import BaseProfile, FilterContext, FilterResult
@@ -97,6 +98,8 @@ class ProfileObBos(BaseProfile):
             return FilterResult(pasa=True, motivo="Sin OB relevante cerca del precio")
 
         # Para cada OB relevante, verificar si tuvo BOS previo
+        ob_max_age = int(os.getenv("OB_MAX_AGE", "0"))  # 0 = sin límite de edad
+
         for ob in obs_relevantes:
             # Encontrar el índice del OB en el DataFrame completo
             try:
@@ -109,6 +112,12 @@ class ProfileObBos(BaseProfile):
 
             if ob_pos < 5:
                 continue  # No hay suficiente historia antes del OB
+
+            # Filtro de edad del OB: si está configurado, descartar OBs viejos
+            if ob_max_age > 0 and (idx - ob_pos) > ob_max_age:
+                logger.debug("OB descartado por edad: %d velas (max %d)",
+                             idx - ob_pos, ob_max_age)
+                continue
 
             # Buscar BOS ANTES del OB (en las velas previas)
             bos_previo = self._buscar_bos_previo_al_ob(

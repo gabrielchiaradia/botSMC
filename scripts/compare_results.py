@@ -55,6 +55,8 @@ Ejemplos:
     )
     p.add_argument("files", nargs="*", default=[],
                    help="Archivos JSON a comparar (default: todos en backtest/results/)")
+    p.add_argument("--from-file", default=None,
+                   help="Leer lista de archivos desde un archivo de texto (uno por línea)")
     p.add_argument("--dir", default="backtest/results",
                    help="Directorio donde buscar JSONs (default: backtest/results)")
     p.add_argument("--top", type=int, default=None,
@@ -136,7 +138,18 @@ def buscar_archivos(args) -> list:
     """Encuentra todos los JSONs a comparar."""
     archivos = []
 
-    if args.files:
+    if args.from_file:
+        # Leer lista de archivos desde un archivo de texto
+        try:
+            with open(args.from_file, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#"):
+                        archivos.append(line)
+        except OSError as e:
+            print(f"  Error leyendo {args.from_file}: {e}")
+            return []
+    elif args.files:
         # Archivos pasados por CLI (soporta glob)
         for pattern in args.files:
             # Buscar en dir y en cwd
