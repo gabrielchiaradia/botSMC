@@ -69,6 +69,8 @@ Ejemplos:
                    help="Filtrar resultados con menos de N trades")
     p.add_argument("--csv", default=None,
                    help="Exportar comparación a CSV")
+    p.add_argument("--excel", default=None,
+                   help="Exportar comparación a Excel (.xlsx)")
     return p.parse_args()
 
 
@@ -268,6 +270,77 @@ def exportar_csv(resultados: list, path: str):
     print(f"  CSV exportado: {path}")
 
 
+def exportar_excel(resultados: list, path: str):
+    """Exporta la comparación a Excel con formato."""
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    except ImportError:
+        print(f"  {YELLOW}⚠ openpyxl no instalado. Instalá con: pip install openpyxl{RESET}")
+        return
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Comparación"
+
+    headers = ["Symbol", "TF", "Strategy", "Trailing", "Windows", "Días",
+               "RR", "Retorno %", "Trades", "Win Rate %", "Profit Factor",
+               "Max DD %", "Sharpe", "Avg Win", "Avg Loss", "Avg RR",
+               "Cap Inicial", "Cap Final", "Archivo"]
+
+    header_font = Font(bold=True, color="FFFFFF", size=10)
+    header_fill = PatternFill(start_color="1F2937", end_color="1F2937", fill_type="solid")
+    thin_border = Border(bottom=Side(style='thin', color='D1D5DB'))
+    green_font = Font(color="16A34A")
+    red_font = Font(color="DC2626")
+
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center')
+
+    for row_idx, r in enumerate(resultados, 2):
+        valores = [
+            r.get("symbol", "?"),
+            r.get("timeframe", "?"),
+            r.get("perfil", "?"),
+            r.get("trailing", "none"),
+            r.get("windows", "24h"),
+            r.get("dias", "?"),
+            r.get("rr_config", "?"),
+            r.get("ret", 0),
+            r.get("trades", 0),
+            r.get("wr", 0),
+            r.get("pf", 0),
+            r.get("dd", 0),
+            r.get("sharpe", 0),
+            r.get("avg_win", 0),
+            r.get("avg_loss", 0),
+            r.get("avg_rr", 0),
+            r.get("cap_ini", 0),
+            r.get("cap_fin", 0),
+            r.get("archivo", ""),
+        ]
+
+        for col, val in enumerate(valores, 1):
+            cell = ws.cell(row=row_idx, column=col, value=val)
+            cell.border = thin_border
+            if col == 8:  # Retorno
+                cell.font = green_font if val >= 0 else red_font
+            if col == 11:  # PF
+                cell.font = green_font if val >= 1.3 else red_font
+
+    for col in ws.columns:
+        max_len = max(len(str(cell.value or "")) for cell in col)
+        ws.column_dimensions[col[0].column_letter].width = min(max_len + 3, 30)
+
+    ws.auto_filter.ref = f"A1:{chr(64+len(headers))}{len(resultados)+1}"
+
+    wb.save(path)
+    print(f"  Excel exportado: {path}")
+
+
 def main():
     args = parse_args()
 
@@ -303,6 +376,9 @@ def main():
 
     if args.csv:
         exportar_csv(resultados, args.csv)
+
+    if args.excel:
+        exportar_excel(resultados, args.excel)
 
 
 if __name__ == "__main__":

@@ -5,7 +5,6 @@
 # ── CREDENCIALES — NUNCA COMMITEAR ───────────
 .env
 *.env
-.env*
 .env.local
 .env.*.local
 secrets.py
