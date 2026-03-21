@@ -218,7 +218,6 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
             señal   = senal,
             swings  = swings,
             atr     = atr,
-            precio  = df_ltf["close"].iloc[-1],
         )
         pasa, motivos_filtro = perfil.apply(ctx)
         if not pasa:
