@@ -30,7 +30,7 @@ from datetime import datetime, timezone
 from typing import Callable, Optional
 from utils.logger import get_logger
 
-#
+logger = get_logger(__name__)
 # ══════════════════════════════════════════════════════════
 #  BUFFER DE VELAS
 # ══════════════════════════════════════════════════════════
