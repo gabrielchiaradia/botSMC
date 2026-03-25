@@ -28,9 +28,9 @@ import numpy as np
 from collections import deque
 from datetime import datetime, timezone
 from typing import Callable, Optional
-from src.logger import logger
+from utils.logger import get_logger
 
-
+#
 # ══════════════════════════════════════════════════════════
 #  BUFFER DE VELAS
 # ══════════════════════════════════════════════════════════
