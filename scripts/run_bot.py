@@ -96,7 +96,7 @@ def verificar_cierre_live(client, symbol, journal, balance):
     if not journal.hay_trade_abierto() or not client:
         return cerrados
     try:
-        posiciones = client.futures_get_position_risk(symbol=symbol)
+        posiciones = client.futures_position_information(symbol=symbol)
         pos_amt = 0
         mark_price = 0
         for p in posiciones:
