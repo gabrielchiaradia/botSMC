@@ -19,6 +19,7 @@ import os
 import time
 import argparse
 import json
+import websocket
 from pathlib import Path
 
 # ── Pre-parsear --bot-number ANTES de importar config ────────────────────
