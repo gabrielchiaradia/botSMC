@@ -76,7 +76,7 @@ def ejecutar_orden_entrada(client, senal, tamanio, symbol) -> str:
     lado_sl = "SELL" if lado == "BUY" else "BUY"
     
     # Redondear para cumplir con precisión de Binance
-    if symbol == "ETHUSDT:
+    if symbol == "ETHUSDT":
         tamanio = round(tamanio, 3)  # ETH: 3 decimales
         sl_price = round(senal.stop_loss, 2)
         tp_price = round(senal.take_profit, 2)
