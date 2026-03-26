@@ -100,15 +100,13 @@ class TradeJournal:
 
     def __init__(self, log_dir: Path = None, symbol: str = "BTCUSDT",
                  timeframe: str = "15m", modo: str = "PAPER",
-                 max_open: int = 1, bot_tag: str = ""):
-        from config.settings import logs as lcfg, risk as rcfg, BOT_NUMBER
+                 max_open: int = 1):
+        from config.settings import logs as lcfg, risk as rcfg
         self.log_dir    = log_dir or lcfg.LOG_DIR
         self.symbol     = symbol
         self.timeframe  = timeframe
         self.modo       = modo
         self.max_open   = max_open or rcfg.MAX_OPEN_TRADES
-        self.bot_tag    = bot_tag
-        self._bot_num   = BOT_NUMBER
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
         self._fecha           = datetime.now().strftime("%Y%m%d")
@@ -116,23 +114,18 @@ class TradeJournal:
         self._trade_counter   = self._contar_trades_hoy()
         self._racha_sl        = 0    # SL consecutivos
 
-        logger.info("[%s] TradeJournal iniciado | Modo: %s | Max open: %d | Dir: %s",
-                    bot_tag or "Bot1", modo, self.max_open, self.log_dir)
+        logger.info("TradeJournal iniciado | Modo: %s | Max open: %d | Dir: %s",
+                    modo, self.max_open, self.log_dir)
 
     # ── Paths de archivos ──────────────────────────────────
 
     @property
-    def _bot_suffix(self) -> str:
-        """Sufijo para archivos: '' para bot 1, '_2' para bot 2, etc."""
-        return f"_{self._bot_num}" if self._bot_num > 1 else ""
-
-    @property
     def _signals_path(self) -> Path:
-        return self.log_dir / f"signals{self._bot_suffix}_{self._fecha}.json"
+        return self.log_dir / f"signals_{self._fecha}.json"
 
     @property
     def _trades_path(self) -> Path:
-        return self.log_dir / f"trades{self._bot_suffix}_{self._fecha}.json"
+        return self.log_dir / f"trades_{self._fecha}.json"
 
     # ── API pública ────────────────────────────────────────
 
@@ -331,40 +324,11 @@ class TradeJournal:
             "win_rate": round(wr, 1),
         }
 
-    def exportar_posiciones_abiertas(self) -> dict:
-        """Exporta las posiciones abiertas actuales como dict para JSON."""
-        from datetime import datetime
-        posiciones = []
-        for t in self._trades_abiertos:
-            posiciones.append({
-                "id":             t.id,
-                "symbol":         t.symbol,
-                "timeframe":      t.timeframe,
-                "direccion":      t.direccion,
-                "precio_entrada": t.precio_entrada,
-                "stop_loss":      t.stop_loss,
-                "take_profit":    t.take_profit,
-                "tamaño":         t.tamaño,
-                "capital_in":     t.capital_in,
-                "score_señal":    t.score_señal,
-                "sesion":         t.sesion,
-                "timestamp_in":   t.timestamp_in,
-                "atr_entrada":    t.atr_entrada,
-                "modo":           t.modo,
-            })
-        return {
-            "bot_tag":       self.bot_tag,
-            "bot_num":       self._bot_num,
-            "symbol":        self.symbol,
-            "timeframe":     self.timeframe,
-            "modo":          self.modo,
-            "num_abiertas":  len(posiciones),
-            "max_trades":    self.max_open,
-            "posiciones":    posiciones,
-            "updated_at":    datetime.now().isoformat(),
-        }
-
     def exportar_como_backtest(self) -> dict:
+        """
+        Convierte los trades del día a formato compatible
+        con el dashboard del backtest para visualizarlos.
+        """
         trades_raw = self.leer_trades_hoy()
         if not trades_raw:
             return {}

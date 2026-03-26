@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SMC Bot — Guía de Operaciones</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink:     #0f0f0f;
+  --paper:   #f5f2eb;
+  --cream:   #ede9df;
+  --rule:    #d4cfc4;
+  --accent:  #c1440e;
+  --accent2: #1a5c3a;
+  --code-bg: #1c1c1c;
+  --code-fg: #e8e0d0;
+  --warn:    #8b5e00;
+  --warn-bg: #fdf6e3;
+  --ok:      #1a5c3a;
+  --ok-bg:   #edf7f1;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { background: var(--paper); color: var(--ink); font-family: 'IBM Plex Mono', monospace; font-size: 13px; line-height: 1.8; min-height: 100vh; }
+body::before { content: ''; position: fixed; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events: none; z-index: 0; opacity: 0.4; }
+.page { max-width: 860px; margin: 0 auto; padding: 0 32px 80px; position: relative; z-index: 1; }
+.cover { border-bottom: 3px double var(--rule); padding: 60px 0 40px; margin-bottom: 48px; }
+.cover-tag { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); margin-bottom: 16px; }
+.cover h1 { font-family: 'DM Serif Display', serif; font-size: clamp(32px, 5vw, 52px); line-height: 1.1; color: var(--ink); margin-bottom: 12px; }
+.cover h1 em { color: var(--accent); font-style: italic; }
+.cover-sub { color: #5a5449; font-size: 12px; margin-bottom: 28px; }
+.cover-meta { display: flex; gap: 24px; flex-wrap: wrap; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #8a8070; padding-top: 20px; border-top: 1px solid var(--rule); }
+.cover-meta span::before { content: '◆ '; color: var(--accent); }
+.toc { background: var(--cream); border: 1px solid var(--rule); border-left: 4px solid var(--accent); padding: 24px 28px; margin-bottom: 48px; }
+.toc h2 { font-family: 'DM Serif Display', serif; font-size: 16px; margin-bottom: 16px; color: var(--ink); }
+.toc ol { padding-left: 20px; }
+.toc li { margin-bottom: 6px; }
+.toc a { color: var(--ink); text-decoration: none; font-size: 12px; border-bottom: 1px dotted var(--rule); transition: color 0.2s; }
+.toc a:hover { color: var(--accent); border-color: var(--accent); }
+.section { margin-bottom: 56px; }
+.section-header { display: flex; align-items: baseline; gap: 16px; border-bottom: 2px solid var(--ink); padding-bottom: 8px; margin-bottom: 28px; }
+.section-num { font-family: 'DM Serif Display', serif; font-size: 42px; color: var(--rule); line-height: 1; flex-shrink: 0; }
+.section-title { font-family: 'DM Serif Display', serif; font-size: 22px; color: var(--ink); }
+h3 { font-family: 'DM Serif Display', serif; font-size: 16px; margin: 28px 0 12px; color: var(--ink); }
+h3::before { content: '§ '; color: var(--accent); font-style: italic; }
+p { margin-bottom: 12px; color: #2a2520; }
+pre { background: var(--code-bg); color: var(--code-fg); border-radius: 4px; padding: 20px 24px; overflow-x: auto; margin: 16px 0; font-size: 12px; line-height: 1.7; position: relative; border-left: 3px solid var(--accent); }
+pre .comment { color: #6a6055; }
+pre .cmd { color: #7ab8f5; }
+pre .val { color: #9ec88a; }
+pre .warn-c { color: #f0c060; }
+code { background: var(--cream); border: 1px solid var(--rule); padding: 1px 5px; border-radius: 2px; font-size: 11px; color: var(--accent); }
+pre code { background: none; border: none; padding: 0; color: inherit; font-size: inherit; }
+.code-block { position: relative; }
+.copy-btn { position: absolute; top: 10px; right: 10px; background: #2e2e2e; border: 1px solid #444; color: #aaa; font-family: 'IBM Plex Mono', monospace; font-size: 10px; padding: 3px 8px; border-radius: 3px; cursor: pointer; transition: all 0.2s; letter-spacing: 0.05em; }
+.copy-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.copy-btn.copied { background: var(--accent2); color: #fff; border-color: var(--accent2); }
+.alert { padding: 14px 18px; border-radius: 2px; margin: 16px 0; font-size: 12px; line-height: 1.6; border-left: 4px solid; }
+.alert-warn { background: var(--warn-bg); border-color: var(--warn); color: var(--warn); }
+.alert-ok { background: var(--ok-bg); border-color: var(--ok); color: var(--ok); }
+.alert-info { background: var(--cream); border-color: var(--rule); color: #5a5449; }
+.alert strong { display: block; margin-bottom: 4px; text-transform: uppercase; font-size: 10px; letter-spacing: 0.1em; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 11px; }
+th { background: var(--ink); color: var(--paper); padding: 8px 12px; text-align: left; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; font-size: 10px; }
+td { padding: 8px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+tr:nth-child(even) td { background: var(--cream); }
+td code { font-size: 11px; }
+footer { border-top: 3px double var(--rule); padding: 24px 0; margin-top: 60px; font-size: 10px; color: #8a8070; display: flex; justify-content: space-between; align-items: center; letter-spacing: 0.05em; }
+@media (max-width: 600px) { .page { padding: 0 16px 60px; } .cover h1 { font-size: 28px; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- PORTADA -->
+<div class="cover">
+  <div class="cover-tag">Guía de operaciones · v1.0</div>
+  <h1>SMC Futures Bot<br><em>Manual de Operaciones</em></h1>
+  <div class="cover-sub">Cómo conectarse, iniciar, parar, monitorizar y mantener el bot en el VPS</div>
+  <div class="cover-meta">
+    <span>Vultr VPS</span>
+    <span>Docker</span>
+    <span>SSH</span>
+    <span>Dashboard</span>
+    <span>Telegram</span>
+  </div>
+</div>
+
+<!-- ÍNDICE -->
+<div class="toc">
+  <h2>Índice</h2>
+  <ol>
+    <li><a href="#s1">Conectarse al servidor (SSH)</a></li>
+    <li><a href="#s2">Bot: iniciar, parar y reiniciar</a></li>
+    <li><a href="#s3">Ver logs del bot</a></li>
+    <li><a href="#s4">Dashboard web: iniciar y parar</a></li>
+    <li><a href="#s5">Subir cambios al servidor (Git)</a></li>
+    <li><a href="#s6">Editar configuración (.env)</a></li>
+    <li><a href="#s7">Correr backtests en el VPS</a></li>
+    <li><a href="#s8">Correr análisis sistemático</a></li>
+    <li><a href="#s9">Pasar de Testnet a Real</a></li>
+    <li><a href="#s10">Referencia rápida de comandos</a></li>
+  </ol>
+</div>
+
+
+<!-- 1 -->
+<div class="section" id="s1">
+  <div class="section-header">
+    <span class="section-num">01</span>
+    <span class="section-title">Conectarse al servidor (SSH)</span>
+  </div>
+
+  <h3>Desde Windows (CMD o PowerShell)</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">ssh</span> -i C:\Users\Gabriel\.ssh\id_ed25519 root@167.179.114.168</pre>
+  </div>
+
+  <h3>Cambiar al usuario botuser</h3>
+  <p>El bot corre como <code>botuser</code>, no como root. Después de conectarte:</p>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">su</span> - botuser
+<span class="cmd">cd</span> ~/smc-bot</pre>
+  </div>
+
+  <h3>Desconectarse</h3>
+  <div class="code-block">
+    <pre><span class="cmd">exit</span>           <span class="comment"># salir de botuser → vuelve a root</span>
+<span class="cmd">exit</span>           <span class="comment"># salir del VPS → vuelve a tu PC</span></pre>
+  </div>
+</div>
+
+
+<!-- 2 -->
+<div class="section" id="s2">
+  <div class="section-header">
+    <span class="section-num">02</span>
+    <span class="section-title">Bot: iniciar, parar y reiniciar</span>
+  </div>
+
+  <p>El bot corre dentro de un container Docker. Todos los comandos se ejecutan desde <code>~/smc-bot</code> como <code>botuser</code>.</p>
+
+  <h3>Iniciar el bot</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">docker compose</span> up -d --build smc-bot watchtower</pre>
+  </div>
+  <p>El flag <code>-d</code> lo ejecuta en background. El bot sigue corriendo aunque cierres la sesión SSH.</p>
+
+  <h3>Parar el bot</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">docker compose</span> down</pre>
+  </div>
+
+  <h3>Reiniciar el bot (sin reconstruir)</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">docker compose</span> restart smc-bot</pre>
+  </div>
+
+  <h3>Reconstruir y reiniciar (después de cambios de código)</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">docker compose</span> down
+<span class="cmd">docker compose</span> build --no-cache smc-bot
+<span class="cmd">docker compose</span> up -d smc-bot watchtower</pre>
+  </div>
+
+  <h3>Ver si el bot está corriendo</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">docker compose</span> ps</pre>
+  </div>
+
+  <div class="alert alert-info">
+    <strong>Inicio automático</strong>
+    El bot tiene <code>restart: unless-stopped</code> en docker-compose.yml. Si el VPS reinicia, el bot se levanta solo.
+  </div>
+</div>
+
+
+<!-- 3 -->
+<div class="section" id="s3">
+  <div class="section-header">
+    <span class="section-num">03</span>
+    <span class="section-title">Ver logs del bot</span>
+  </div>
+
+  <h3>Logs en tiempo real (Ctrl+C para salir)</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">docker compose</span> logs -f smc-bot</pre>
+  </div>
+
+  <h3>Últimas N líneas</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">docker compose</span> logs --tail 50 smc-bot</pre>
+  </div>
+
+  <h3>Log del archivo (persiste entre reinicios)</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">tail</span> -50 ~/smc-bot/logs/smc_bot.log</pre>
+  </div>
+
+  <h3>Seguir el archivo en vivo</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">tail</span> -f ~/smc-bot/logs/smc_bot.log</pre>
+  </div>
+
+  <h3>Ver uso de recursos</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">docker</span> stats smc-bot</pre>
+  </div>
+</div>
+
+
+<!-- 4 -->
+<div class="section" id="s4">
+  <div class="section-header">
+    <span class="section-num">04</span>
+    <span class="section-title">Dashboard web: iniciar y parar</span>
+  </div>
+
+  <p>El dashboard es un container nginx separado que sirve el HTML en el puerto 8080.</p>
+
+  <h3>Iniciar el dashboard (como root)</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">docker run</span> -d \
+  --name smc-dashboard \
+  --restart unless-stopped \
+  -p 8080:80 \
+  -v /home/botuser/smc-bot/dashboard/index.html:/usr/share/nginx/html/index.html:ro \
+  -v /home/botuser/smc-bot/dashboard/nginx.conf:/etc/nginx/conf.d/default.conf:ro \
+  -v /home/botuser/smc-bot/logs:/usr/share/nginx/html/logs:ro \
+  -v /home/botuser/smc-bot/backtest/results:/usr/share/nginx/html/backtest:ro \
+  nginx:latest</pre>
+  </div>
+
+  <h3>Acceder al dashboard</h3>
+  <p>Abrí en tu navegador: <code>http://167.179.114.168:8080</code></p>
+
+  <h3>Parar el dashboard</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">docker rm</span> -f smc-dashboard</pre>
+  </div>
+
+  <h3>Reiniciar el dashboard (después de cambios)</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">docker rm</span> -f smc-dashboard
+<span class="cmd">docker run</span> -d \
+  --name smc-dashboard \
+  --restart unless-stopped \
+  -p 8080:80 \
+  -v /home/botuser/smc-bot/dashboard/index.html:/usr/share/nginx/html/index.html:ro \
+  -v /home/botuser/smc-bot/dashboard/nginx.conf:/etc/nginx/conf.d/default.conf:ro \
+  -v /home/botuser/smc-bot/logs:/usr/share/nginx/html/logs:ro \
+  -v /home/botuser/smc-bot/backtest/results:/usr/share/nginx/html/backtest:ro \
+  nginx:latest</pre>
+  </div>
+</div>
+
+
+<!-- 5 -->
+<div class="section" id="s5">
+  <div class="section-header">
+    <span class="section-num">05</span>
+    <span class="section-title">Subir cambios al servidor (Git)</span>
+  </div>
+
+  <h3>Paso 1: Desde tu PC Windows, pushear a GitHub</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">cd</span> C:\Users\Gabriel\Downloads\smc-bot-improved
+<span class="cmd">git</span> add .
+<span class="cmd">git</span> commit -m <span class="val">"descripción del cambio"</span>
+<span class="cmd">git</span> push</pre>
+  </div>
+
+  <h3>Paso 2: Desde el VPS, bajar los cambios</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">cd</span> ~/smc-bot
+<span class="cmd">git</span> pull</pre>
+  </div>
+
+  <h3>Paso 3: Reconstruir el bot con los cambios</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">docker compose</span> down
+<span class="cmd">docker compose</span> build --no-cache smc-bot
+<span class="cmd">docker compose</span> up -d smc-bot watchtower</pre>
+  </div>
+
+  <div class="alert alert-warn">
+    <strong>Importante</strong>
+    El <code>.env</code> no se sube a Git (está en .gitignore). Si cambiás el .env en tu PC, tenés que editarlo manualmente en el VPS también.
+  </div>
+</div>
+
+
+<!-- 6 -->
+<div class="section" id="s6">
+  <div class="section-header">
+    <span class="section-num">06</span>
+    <span class="section-title">Editar configuración (.env)</span>
+  </div>
+
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">nano</span> ~/smc-bot/.env</pre>
+  </div>
+
+  <p>Editá los valores que necesites. Guardá con <code>Ctrl+O</code>, Enter, <code>Ctrl+X</code>.</p>
+
+  <h3>Configuración actual recomendada</h3>
+  <table>
+    <tr><th>Variable</th><th>Valor</th><th>Descripción</th></tr>
+    <tr><td><code>SYMBOL</code></td><td><code>ETHUSDT</code></td><td>Par de trading</td></tr>
+    <tr><td><code>TIMEFRAME</code></td><td><code>1h</code></td><td>Velas de 1 hora</td></tr>
+    <tr><td><code>MTF_LTF</code></td><td><code>1h</code></td><td>Timeframe de entrada</td></tr>
+    <tr><td><code>MTF_HTF</code></td><td><code>4h</code></td><td>Timeframe de contexto</td></tr>
+    <tr><td><code>SCORE_MINIMO</code></td><td><code>50</code></td><td>Score mínimo para operar</td></tr>
+    <tr><td><code>ATR_MULTIPLIER</code></td><td><code>1.5</code></td><td>Distancia del SL</td></tr>
+    <tr><td><code>TP_RR_RATIO</code></td><td><code>2.0</code></td><td>Ratio riesgo:recompensa</td></tr>
+    <tr><td><code>MAX_OPEN_TRADES</code></td><td><code>2</code></td><td>Trades simultáneos</td></tr>
+    <tr><td><code>RISK_PER_TRADE</code></td><td><code>0.01</code></td><td>1% del capital por trade</td></tr>
+    <tr><td><code>TESTNET</code></td><td><code>true</code></td><td>Dinero ficticio</td></tr>
+  </table>
+
+  <p>Después de editar, reiniciá el bot:</p>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">docker compose</span> down
+<span class="cmd">docker compose</span> up -d smc-bot watchtower</pre>
+  </div>
+</div>
+
+
+<!-- 7 -->
+<div class="section" id="s7">
+  <div class="section-header">
+    <span class="section-num">07</span>
+    <span class="section-title">Correr backtests en el VPS</span>
+  </div>
+
+  <p>Los backtests se ejecutan con Python directamente, sin Docker.</p>
+
+  <h3>Backtest básico</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">cd</span> ~/smc-bot
+<span class="cmd">python3</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 1h --dias 90</pre>
+  </div>
+
+  <h3>Con perfil y trailing</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python3</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 1h --dias 90 --strategy ob_bos --trailing hibrido</pre>
+  </div>
+
+  <h3>Comparar trailing</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python3</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 1h --dias 90 --compare-trailing</pre>
+  </div>
+
+  <h3>Con múltiples trades</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python3</span> scripts/run_backtest.py --symbol ETHUSDT --timeframe 1h --dias 360 --max-trades 2</pre>
+  </div>
+
+  <p>Los resultados se guardan en <code>backtest/results/</code> y se ven en el dashboard.</p>
+</div>
+
+
+<!-- 8 -->
+<div class="section" id="s8">
+  <div class="section-header">
+    <span class="section-num">08</span>
+    <span class="section-title">Correr análisis sistemático</span>
+  </div>
+
+  <p>El script <code>run_systematic.py</code> prueba automáticamente múltiples combinaciones y encuentra la configuración óptima.</p>
+
+  <h3>Análisis completo (todos los pares y timeframes)</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python3</span> scripts/run_systematic.py --dias 180</pre>
+  </div>
+
+  <h3>Forzar par y timeframe (salta Fase 1)</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python3</span> scripts/run_systematic.py --symbol ETHUSDT --timeframe 1h --dias 360</pre>
+  </div>
+
+  <h3>Con múltiples trades</h3>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">python3</span> scripts/run_systematic.py --symbol ETHUSDT --timeframe 1h --dias 360 --max-trades 2</pre>
+  </div>
+
+  <h3>Fases del análisis</h3>
+  <table>
+    <tr><th>Fase</th><th>Qué prueba</th></tr>
+    <tr><td>1</td><td>Mejor par + timeframe (BTC/ETH × 15m/1h)</td></tr>
+    <tr><td>2</td><td>Mejor perfil + trailing (base/ob_bos × none/escalones/hibrido)</td></tr>
+    <tr><td>3</td><td>Mejor score mínimo + ATR multiplier</td></tr>
+    <tr><td>4</td><td>Mejor TP/RR ratio (1:1.5 a 1:5.0)</td></tr>
+    <tr><td>5</td><td>Re-test trailing con el RR óptimo</td></tr>
+  </table>
+</div>
+
+
+<!-- 9 -->
+<div class="section" id="s9">
+  <div class="section-header">
+    <span class="section-num">09</span>
+    <span class="section-title">Pasar de Testnet a Real</span>
+  </div>
+
+  <div class="alert alert-warn">
+    <strong>Precaución</strong>
+    Solo pasar a real después de verificar que el bot funciona correctamente en testnet durante al menos una semana. El trading con futuros y apalancamiento conlleva riesgo de pérdida total del capital.
+  </div>
+
+  <h3>Pasos</h3>
+  <ol>
+    <li>Crear API keys en <a href="https://www.binance.com/es/my/settings/api-management">Binance real</a></li>
+    <li>Editar <code>.env</code> en el VPS:</li>
+  </ol>
+  <div class="code-block">
+    <pre><span class="key">TESTNET</span>=<span class="val">false</span>
+<span class="key">BINANCE_API_KEY</span>=<span class="val">tu_key_real</span>
+<span class="key">BINANCE_API_SECRET</span>=<span class="val">tu_secret_real</span></pre>
+  </div>
+  <ol start="3">
+    <li>Reconstruir el bot:</li>
+  </ol>
+  <div class="code-block">
+    <button class="copy-btn" onclick="copiar(this)">copiar</button>
+    <pre><span class="cmd">docker compose</span> down
+<span class="cmd">docker compose</span> up -d smc-bot watchtower</pre>
+  </div>
+
+  <div class="alert alert-ok">
+    <strong>Recomendación</strong>
+    Empezá con capital mínimo ($50-100) y RISK_PER_TRADE=0.01 (1%). Verificá que las primeras operaciones se ejecutan correctamente antes de aumentar el capital.
+  </div>
+</div>
+
+
+<!-- 10 -->
+<div class="section" id="s10">
+  <div class="section-header">
+    <span class="section-num">10</span>
+    <span class="section-title">Referencia rápida de comandos</span>
+  </div>
+
+  <h3>Conexión SSH</h3>
+  <table>
+    <tr><th>Acción</th><th>Comando</th></tr>
+    <tr><td>Conectarse al VPS</td><td><code>ssh -i C:\Users\Gabriel\.ssh\id_ed25519 root@167.179.114.168</code></td></tr>
+    <tr><td>Cambiar a botuser</td><td><code>su - botuser</code></td></tr>
+    <tr><td>Ir al proyecto</td><td><code>cd ~/smc-bot</code></td></tr>
+  </table>
+
+  <h3>Docker — Bot</h3>
+  <table>
+    <tr><th>Acción</th><th>Comando</th></tr>
+    <tr><td>Iniciar bot</td><td><code>docker compose up -d smc-bot watchtower</code></td></tr>
+    <tr><td>Parar todo</td><td><code>docker compose down</code></td></tr>
+    <tr><td>Reiniciar bot</td><td><code>docker compose restart smc-bot</code></td></tr>
+    <tr><td>Reconstruir</td><td><code>docker compose build --no-cache smc-bot</code></td></tr>
+    <tr><td>Ver estado</td><td><code>docker compose ps</code></td></tr>
+    <tr><td>Logs en vivo</td><td><code>docker compose logs -f smc-bot</code></td></tr>
+    <tr><td>Últimas 50 líneas</td><td><code>docker compose logs --tail 50 smc-bot</code></td></tr>
+    <tr><td>Uso de recursos</td><td><code>docker stats smc-bot</code></td></tr>
+  </table>
+
+  <h3>Docker — Dashboard</h3>
+  <table>
+    <tr><th>Acción</th><th>Comando</th></tr>
+    <tr><td>Parar dashboard</td><td><code>docker rm -f smc-dashboard</code></td></tr>
+    <tr><td>Iniciar dashboard</td><td>(ver sección 4 — comando largo)</td></tr>
+    <tr><td>Ver en navegador</td><td><code>http://167.179.114.168:8080</code></td></tr>
+  </table>
+
+  <h3>Git — Actualizar código</h3>
+  <table>
+    <tr><th>Acción</th><th>Comando</th></tr>
+    <tr><td>Subir desde Windows</td><td><code>git add . && git commit -m "msg" && git push</code></td></tr>
+    <tr><td>Bajar en VPS</td><td><code>git pull</code></td></tr>
+    <tr><td>Aplicar cambios</td><td><code>docker compose down && docker compose build --no-cache smc-bot && docker compose up -d</code></td></tr>
+  </table>
+
+  <h3>Backtests</h3>
+  <table>
+    <tr><th>Acción</th><th>Comando</th></tr>
+    <tr><td>Backtest básico</td><td><code>python3 scripts/run_backtest.py --symbol ETHUSDT --timeframe 1h --dias 90</code></td></tr>
+    <tr><td>Systematic</td><td><code>python3 scripts/run_systematic.py --symbol ETHUSDT --timeframe 1h --dias 360</code></td></tr>
+    <tr><td>Con 2 trades</td><td>Agregar <code>--max-trades 2</code></td></tr>
+    <tr><td>Comparar trailing</td><td>Agregar <code>--compare-trailing</code></td></tr>
+  </table>
+
+  <h3>Configuración</h3>
+  <table>
+    <tr><th>Acción</th><th>Comando</th></tr>
+    <tr><td>Editar .env</td><td><code>nano ~/smc-bot/.env</code></td></tr>
+    <tr><td>Ver .env actual</td><td><code>cat ~/smc-bot/.env</code></td></tr>
+    <tr><td>Ver archivos de log</td><td><code>ls -la ~/smc-bot/logs/</code></td></tr>
+    <tr><td>Ver resultados backtest</td><td><code>ls -la ~/smc-bot/backtest/results/</code></td></tr>
+  </table>
+</div>
+
+
+<footer>
+  <span>SMC Futures Bot · Manual de Operaciones v1.0</span>
+  <span>VPS Vultr · Docker · GitHub</span>
+</footer>
+
+</div><!-- /page -->
+
+<script>
+function copiar(btn) {
+  var pre = btn.parentElement.querySelector('pre');
+  var texto = pre.innerText;
+  navigator.clipboard.writeText(texto).then(function() {
+    btn.textContent = '✓ copiado';
+    btn.classList.add('copied');
+    setTimeout(function() {
+      btn.textContent = 'copiar';
+      btn.classList.remove('copied');
+    }, 2000);
+  }).catch(function() {
+    btn.textContent = 'error';
+    setTimeout(function() { btn.textContent = 'copiar'; }, 2000);
+  });
+}
+</script>
+</body>
+</html>
