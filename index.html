@@ -524,32 +524,6 @@
     content: ''; flex: 1; height: 1px; background: var(--border);
   }
 
-  /* ─── TOGGLE BACKTEST BUTTON ─── */
-  .btn-toggle-bt {
-    display: flex; align-items: center; gap: 8px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--muted);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px; font-weight: 600;
-    padding: 10px 20px;
-    cursor: pointer;
-    transition: all 0.2s;
-    margin-bottom: 16px;
-    letter-spacing: 0.05em;
-  }
-  .btn-toggle-bt:hover {
-    border-color: var(--accent2);
-    color: var(--accent2);
-    background: rgba(124,58,237,0.06);
-  }
-  .btn-toggle-bt.open {
-    border-color: var(--accent2);
-    color: var(--accent2);
-    background: rgba(124,58,237,0.08);
-  }
-
 </style>
 </head>
 <body>
@@ -604,38 +578,28 @@
     </div>
   </div>
 
-  <!-- BOTÓN BACKTEST (siempre visible) -->
-  <button class="btn-toggle-bt" id="btn-toggle-bt" onclick="toggleBacktest()">
-    📊 Backtest ▼
-  </button>
-
-  <!-- PANEL BACKTEST (colapsable) -->
-  <div id="backtest-panel" style="display:none">
-
-    <!-- BACKTEST FILES -->
-    <div class="server-files" id="backtest-files-section" style="display:none">
-      <h2>📊 Backtests
-        <button class="btn-reload" onclick="renderBacktestFiles()" title="Recargar">⟳ Recargar</button>
-      </h2>
-      <p>Resultados de backtests guardados en el servidor</p>
-      <div class="file-list" id="backtest-file-list">
-        <span class="no-server-files">Buscando archivos...</span>
-      </div>
+  <!-- BACKTEST FILES (solo visible cuando se accede desde el VPS) -->
+  <div class="server-files" id="backtest-files-section" style="display:none">
+    <h2>📊 Backtests
+      <button class="btn-reload" onclick="renderBacktestFiles()" title="Recargar">⟳ Recargar</button>
+    </h2>
+    <p>Resultados de backtests guardados en el servidor</p>
+    <div class="file-list" id="backtest-file-list">
+      <span class="no-server-files">Buscando archivos...</span>
     </div>
+  </div>
 
-    <div class="divider" id="divider-or" style="display:none">o cargar archivo local</div>
+  <div class="divider" id="divider-or" style="display:none">o cargar archivo local</div>
 
-    <!-- UPLOAD ZONE -->
-    <div id="upload-zone" onclick="document.getElementById('file-input').click()">
-      <div class="upload-icon">📂</div>
-      <h2>Cargar resultados del backtest</h2>
-      <p>Arrastra un archivo <code>.json</code> de backtest aquí<br>o haz clic para seleccionarlo</p>
-      <input type="file" id="file-input" accept=".json" onchange="cargarArchivo(event)">
-    </div>
+  <!-- UPLOAD ZONE -->
+  <div id="upload-zone" onclick="document.getElementById('file-input').click()">
+    <div class="upload-icon">📂</div>
+    <h2>Cargar resultados del backtest</h2>
+    <p>Arrastra un archivo <code>.json</code> de backtest aquí<br>o haz clic para seleccionarlo</p>
+    <input type="file" id="file-input" accept=".json" onchange="cargarArchivo(event)">
+  </div>
 
-  </div><!-- /backtest-panel -->
-
-  <!-- DASHBOARD LIVE (siempre visible) -->
+  <!-- DASHBOARD -->
   <div id="dashboard">
 
     <!-- UPLOAD LOCAL BUTTON (visible when dashboard is active) -->
@@ -843,14 +807,6 @@ function inicializar(data) {
   DATA = data;
   document.getElementById('upload-zone').style.display = 'none';
   document.getElementById('dashboard').style.display   = 'block';
-
-  // Abrir el panel backtest automáticamente al cargar datos
-  const panel = document.getElementById('backtest-panel');
-  const btn   = document.getElementById('btn-toggle-bt');
-  if (panel && panel.style.display === 'none') {
-    panel.style.display = 'block';
-    if (btn) { btn.classList.add('open'); btn.textContent = '📊 Backtest ▲'; }
-  }
 
   // Detectar si es archivo de comparación (systematic)
   if (data.comparacion && data.perfiles) {
@@ -1472,22 +1428,6 @@ function filtrarTrades(filtro, btn) {
 }
 
 // ═══════════════════════════════════════════
-//  TOGGLE BACKTEST PANEL
-// ═══════════════════════════════════════════
-function toggleBacktest() {
-  const panel = document.getElementById('backtest-panel');
-  const btn   = document.getElementById('btn-toggle-bt');
-  const open  = panel.style.display !== 'none';
-  panel.style.display = open ? 'none' : 'block';
-  btn.classList.toggle('open', !open);
-  btn.textContent = open ? '📊 Backtest ▼' : '📊 Backtest ▲';
-  if (!open) {
-    // Cargar archivos backtest la primera vez que se abre
-    renderBacktestFiles();
-  }
-}
-
-// ═══════════════════════════════════════════
 //  MODO SERVIDOR: carga automática de JSONs
 // ═══════════════════════════════════════════
 
@@ -1591,7 +1531,7 @@ async function renderBacktestFiles() {
 
 async function renderServerFiles() {
   await renderLiveFiles();
-  // Backtest files se cargan solo cuando el usuario abre el panel
+  await renderBacktestFiles();
 }
 
 async function cargarDesdeServidor(filename, btn) {
