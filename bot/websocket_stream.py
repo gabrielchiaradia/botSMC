@@ -28,13 +28,9 @@ import numpy as np
 from collections import deque
 from datetime import datetime, timezone
 from typing import Callable, Optional
-
-from config import exchange as excfg, ws as wscfg
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
-
-
 # ══════════════════════════════════════════════════════════
 #  BUFFER DE VELAS
 # ══════════════════════════════════════════════════════════
@@ -202,14 +198,13 @@ class BinanceKlineStream:
                 break
 
             self._reconexiones += 1
-            if self._reconexiones > wscfg.MAX_RECONNECTS:
-                logger.error("Máximo de reconexiones alcanzado (%d). Deteniendo stream.",
-                             wscfg.MAX_RECONNECTS)
+            if self._reconexiones > 5:
+                logger.error("Máximo de reconexiones alcanzado (%d). Deteniendo stream.",5)
                 self._running = False
                 break
 
             # Backoff exponencial: 5s, 10s, 20s, 40s... máx 120s
-            espera = min(wscfg.RECONNECT_SECS * (2 ** (self._reconexiones - 1)), 120)
+            espera = min(5 * (2 ** (self._reconexiones - 1)), 120)
             logger.warning("WebSocket desconectado. Reconectando en %ds (intento %d)...",
                            espera, self._reconexiones)
             time.sleep(espera)
