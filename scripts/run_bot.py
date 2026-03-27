@@ -432,51 +432,79 @@ def mostrar_resumen(journal, modo, notifier):
 # ══════════════════════════════════════════════════════════
 def reconciliar_posiciones(client, journal, balance):
     """
-    Al iniciar, sincroniza el journal contra Binance (fuente de verdad).
-    1. Marca como CANCELADO los trades ABIERTOS del journal que no existen en Binance.
-    2. Registra posiciones de Binance que el journal no conoce.
+    Sincroniza el journal contra Binance al iniciar.
+    - Limpia trades fantasma (están en journal pero no en Binance)
+    - Restaura posiciones propias huérfanas (están en open_positions.json
+      y en Binance, pero el journal las perdió por crash)
+    - Ignora posiciones manuales o de otros bots
     """
     try:
         posiciones = client.futures_position_information(symbol=excfg.SYMBOL)
-        # Posiciones reales en Binance para este símbolo
         pos_reales = {
             ("LONG" if float(p["positionAmt"]) > 0 else "SHORT"): p
             for p in posiciones
             if float(p["positionAmt"]) != 0
         }
 
-        # 1. Limpiar trades fantasma del journal
-        for t in journal.trades_abiertos():
+        # 1. Limpiar fantasmas del journal
+        for t in list(journal.trades_abiertos()):
             if t.direccion not in pos_reales:
                 logger.warning(
-                    "[%s] ⚠️  Trade fantasma eliminado: %s @ $%.2f — no existe en Binance.",
+                    "[%s] ⚠️  Trade fantasma eliminado: %s @ $%.2f",
                     BOT_TAG, t.direccion, t.precio_entrada
                 )
                 journal.cerrar_trade(
-                    precio_salida = t.precio_entrada,  # PnL = 0
+                    precio_salida = t.precio_entrada,
                     capital_out   = balance,
                     motivo_cierre = "CANCELADO",
                     trade         = t,
                 )
 
-        # 2. Registrar posiciones de Binance no conocidas por el journal
-        for direccion, p in pos_reales.items():
-            ya_registrada = any(
-                t.direccion == direccion
-                for t in journal.trades_abiertos()
-            )
-            if not ya_registrada:
-                logger.warning(
-                    "[%s] ⚠️  Posición en Binance no registrada: %s %.3f @ $%s — registrando.",
-                    BOT_TAG, direccion, abs(float(p["positionAmt"])), p["entryPrice"]
+        # 2. Restaurar posiciones propias huérfanas desde open_positions.json
+        from config.settings import logs as lcfg
+        suffix = f"_{BOT_NUMBER}" if BOT_NUMBER > 1 else ""
+        op_path = lcfg.LOG_DIR / f"open_positions{suffix}.json"
+
+        if op_path.exists():
+            import json as _json
+            op_data = _json.loads(op_path.read_text())
+            for pos in op_data.get("posiciones", []):
+                direccion = pos["direccion"]
+                entry     = float(pos["precio_entrada"])
+
+                # ¿Ya está en el journal?
+                ya_en_journal = any(
+                    t.direccion == direccion
+                    for t in journal.trades_abiertos()
                 )
-                journal.registrar_posicion_externa(p, balance)
+                if ya_en_journal:
+                    continue
+
+                # ¿Existe en Binance?
+                if direccion not in pos_reales:
+                    continue
+
+                # ¿El precio de entrada coincide (tolerancia 2%)?
+                binance_entry = float(pos_reales[direccion]["entryPrice"])
+                tolerancia = abs(entry - binance_entry) / binance_entry
+                if tolerancia > 0.02:
+                    logger.warning(
+                        "[%s] Posición en Binance no coincide con open_positions "
+                        "(entry $%.2f vs $%.2f) — ignorando.",
+                        BOT_TAG, entry, binance_entry
+                    )
+                    continue
+
+                logger.warning(
+                    "[%s] ⚠️  Posición propia huérfana restaurada: %s @ $%.2f",
+                    BOT_TAG, direccion, entry
+                )
+                journal.registrar_posicion_externa(pos_reales[direccion], balance)
 
         exportar_posiciones_abiertas(journal)
 
     except Exception as e:
         logger.error("Error reconciliando posiciones con Binance: %s", e)
-
 
 # ══════════════════════════════════════════════════════════
 #  MAIN
