@@ -45,10 +45,6 @@ class FilterContext:
     precio:     float = 0.0
     
     @property
-    def precio(self) -> float:
-        return float(self.df["close"].iloc[self.idx])
-
-    @property
     def timestamp(self) -> pd.Timestamp:
         return self.df.index[self.idx]
 
