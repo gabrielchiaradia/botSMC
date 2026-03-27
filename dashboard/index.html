@@ -590,6 +590,12 @@
     </div>
   </div>
 
+  <!-- KPIs LIVE (justo debajo de posiciones abiertas) -->
+  <div id="kpi-section-live" style="display:none">
+    <div class="section-title">📈 Resumen de Performance</div>
+    <div class="kpi-grid" id="kpi-grid"></div>
+  </div>
+
   <!-- LIVE FILES (solo visible cuando se accede desde el VPS) -->
   <div class="server-files" id="live-files-section" style="display:none">
     <h2>📡 Live Trading
@@ -664,10 +670,6 @@
 
     <!-- NORMAL DASHBOARD CONTENT -->
     <div id="dashboard-content">
-
-    <!-- KPIs -->
-    <div class="section-title">📈 Resumen de Performance</div>
-    <div class="kpi-grid" id="kpi-grid"></div>
 
     <!-- EQUITY CURVE -->
     <div class="section-title">💹 Curva de Equity</div>
@@ -893,6 +895,7 @@ function mostrarComparacion(data) {
 function mostrarDashboardNormal(data) {
   document.getElementById('comparison-view').style.display = 'none';
   document.getElementById('dashboard-content').style.display = 'block';
+  document.getElementById('kpi-section-live').style.display = 'block';
 
   const retPct = ((data.capital_final - data.capital_inicial) / data.capital_inicial * 100).toFixed(2);
   document.getElementById('header-period').textContent =
