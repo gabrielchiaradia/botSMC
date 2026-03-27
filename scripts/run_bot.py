@@ -20,6 +20,7 @@ import time
 import argparse
 import json
 import websocket
+import pandas as pd
 from pathlib import Path
 
 # ── Pre-parsear --bot-number ANTES de importar config ────────────────────
@@ -85,6 +86,7 @@ def ejecutar_orden_entrada(client, senal, tamanio, symbol) -> str:
         tamanio = round(tamanio, 2)  # BTC: 3 decimales
         sl_price = round(senal.stop_loss, 1)
         tp_price = round(senal.take_profit, 1)
+
     try:
         orden = client.futures_create_order(
             symbol=symbol, side=lado, type="MARKET", quantity=tamanio
@@ -157,6 +159,42 @@ def simular_cierre_paper(df, journal, balance):
                 break
     return cerrados
 
+# ══════════════════════════════════════════════════════════
+#  TRACKING DE HORARIO OPERATIVO
+# ══════════════════════════════════════════════════════════
+_en_horario_operativo = False
+
+def chequear_horario_operativo(notifier, balance):
+    global _en_horario_operativo
+    from strategy.indicators import en_ventana_horaria
+    from datetime import datetime
+
+    ahora = pd.Timestamp(datetime.now())
+    dentro = en_ventana_horaria(ahora)
+
+    if dentro and not _en_horario_operativo:
+        _en_horario_operativo = True
+        from config import strategy as scfg
+        windows = scfg.TRADING_WINDOWS_RAW
+        notifier._enviar(
+            f"🟢 *INICIO HORARIO OPERATIVO*\n"
+            f"Ventana: `{windows}` UTC\n"
+            f"Balance: `${balance:,.2f}` USDT\n"
+            f"🕐 `{ahora.strftime('%Y-%m-%d %H:%M')} Local`"
+        )
+        logger.info("🟢 Inicio horario operativo: %s UTC", windows)
+
+    elif not dentro and _en_horario_operativo:
+        _en_horario_operativo = False
+        from config import strategy as scfg
+        windows = scfg.TRADING_WINDOWS_RAW
+        notifier._enviar(
+            f"🔴 *FIN HORARIO OPERATIVO*\n"
+            f"Ventana: `{windows}` UTC cerrada\n"
+            f"Balance: `${balance:,.2f}` USDT\n"
+            f"🕐 `{ahora.strftime('%Y-%m-%d %H:%M')} Local`"
+        )
+        logger.info("🔴 Fin horario operativo: %s UTC", windows)
 
 # ══════════════════════════════════════════════════════════
 #  LOGICA CENTRAL DE ANALISIS
@@ -168,6 +206,9 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
     Soporta múltiples trades simultáneos.
     """
     balance = obtener_balance_usdt(client) if client else balance_ref[0]
+   
+    # Chequear inicio/fin de horario operativo
+    chequear_horario_operativo(notifier, balance)
 
     # Verificar cierre de posiciones abiertas
     trades_cerrados = []
@@ -226,7 +267,7 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
         ctx = FilterContext(
             df      = df_ltf,
             idx     = len(df_ltf) - 1,
-            señal   = señal,
+            señal   = senal,
             swings  = swings,
             atr     = atr,
         )
@@ -234,52 +275,52 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
         if not pasa:
             motivo = motivos_filtro[-1] if motivos_filtro else "Perfil"
             logger.info("Señal filtrada por perfil '%s': %s", perfil.nombre, motivo)
-            journal.registrar_señal(señal, balance, f"FILTRO_{perfil.nombre.upper()}")
+            journal.registrar_señal(senal, balance, f"FILTRO_{perfil.nombre.upper()}")
             return
         # Agregar motivos del perfil a la señal
-        señal.motivos.extend(m for m in motivos_filtro if m and m not in señal.motivos)
+        senal.motivos.extend(m for m in motivos_filtro if m and m not in senal.motivos)
 
     # Filtro ventana horaria: señal válida pero fuera de horario
-    if señal.fuera_de_horario:
-        logger.warning(f"DEBUG: {señal.ticker} | Hora Señal (UTC): {señal.timestamp.hour:02d}:00 | Ventana: {señal.ventana} | Fuera de Horario: {señal.fuera_de_horario}")
+    if senal.fuera_de_horario:
+        logger.warning(f"DEBUG: {senal.ticker} | Hora Señal (UTC): {senal.timestamp.hour:02d}:00 | Ventana: {senal.ventana} | Fuera de Horario: {senal.fuera_de_horario}")
         logger.info("⏰ Señal %s fuera de horario (%s). Registrando sin operar.",
-                    señal.direccion, señal.ventana)
-        journal.registrar_señal(señal, balance, "FUERA_DE_HORARIO")
+                    senal.direccion, senal.ventana)
+        journal.registrar_señal(senal, balance, "FUERA_DE_HORARIO")
         # Notificar por Telegram para tracking
-        notifier.señal_detectada(señal, balance, 0, 0,
+        notifier.señal_detectada(senal, balance, 0, 0,
                                   "⏰ FUERA DE HORARIO — no operada")
         return
 
     # Calcular tamanio
-    res     = resumen_riesgo(balance, señal.precio_entrada, señal.stop_loss, señal.take_profit)
+    res     = resumen_riesgo(balance, senal.precio_entrada, senal.stop_loss, senal.take_profit)
     tamanio = res["tamaño"]
 
     logger.info(
         "señal %s | E: $%.2f SL: $%.2f TP: $%.2f | "
         "Tam: %.5f | Riesgo: $%.2f | RR: 1:%.1f",
-        señal.direccion, señal.precio_entrada, señal.stop_loss, señal.take_profit,
+        senal.direccion, senal.precio_entrada, senal.stop_loss, senal.take_profit,
         tamanio, res["riesgo_usd"], res["rr_ratio"],
     )
 
-    if not validar_tamaño(tamanio, señal.precio_entrada):
+    if not validar_tamaño(tamanio, senal.precio_entrada):
         logger.warning("Tamanio invalido, ignorada.")
-        journal.registrar_señal(señal, balance, "TAMANIO_INVALIDO", tamanio)
+        journal.registrar_señal(senal, balance, "TAMANIO_INVALIDO", tamanio)
         return
 
     # Ejecutar
     if modo_live and client:
-        orden_id = ejecutar_orden_entrada(client, señal, tamanio, excfg.SYMBOL)
+        orden_id = ejecutar_orden_entrada(client, senal, tamanio, excfg.SYMBOL)
         accion   = "ENTRADA"
     else:
         orden_id = ""
         accion   = "PAPER_ENTRADA"
         logger.info("PAPER — orden simulada.")
 
-    journal.registrar_señal(señal, balance, accion, tamanio,
+    journal.registrar_señal(senal, balance, accion, tamanio,
                             res["riesgo_usd"], res["rr_ratio"], orden_id)
-    journal.abrir_trade(señal, tamanio, balance, orden_id)
+    journal.abrir_trade(senal, tamanio, balance, orden_id)
 
-    notifier.señal_detectada(señal, balance, tamanio, res["riesgo_usd"],
+    notifier.señal_detectada(senal, balance, tamanio, res["riesgo_usd"],
                               "LIVE" if modo_live else "PAPER")
 
     if not modo_live:
