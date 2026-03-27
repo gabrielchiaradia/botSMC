@@ -19,7 +19,7 @@ import os
 import time
 import argparse
 import json
-import websocket
+import websocket # type: ignore
 import pandas as pd
 from pathlib import Path
 
@@ -73,35 +73,74 @@ def parse_args():
 #  EJECUCION DE ORDENES
 # ══════════════════════════════════════════════════════════
 def ejecutar_orden_entrada(client, senal, tamanio, symbol) -> str:
+    import hmac, hashlib, time, urllib.request, urllib.parse, json
     from binance.exceptions import BinanceAPIException
+    from config import creds, exchange as excfg
+
     lado    = "BUY"  if senal.direccion == "ALCISTA" else "SELL"
     lado_sl = "SELL" if lado == "BUY" else "BUY"
-    
-    # Redondear para cumplir con precisión de Binance
-    if symbol == "ETHUSDT":
-        tamanio = round(tamanio, 3)  # ETH: 3 decimales
-        sl_price = round(senal.stop_loss, 2)
-        tp_price = round(senal.take_profit, 2)
-    else:
-        tamanio = round(tamanio, 2)  # BTC: 3 decimales
-        sl_price = round(senal.stop_loss, 1)
-        tp_price = round(senal.take_profit, 1)
 
+    sl_price = round(senal.stop_loss, 2)
+    tp_price = round(senal.take_profit, 2)
+
+    # 1. Orden de entrada (MARKET)
     try:
         orden = client.futures_create_order(
             symbol=symbol, side=lado, type="MARKET", quantity=tamanio
         )
         oid = str(orden["orderId"])
         logger.info("Orden ejecutada: ID %s | %s %.3f %s", oid, lado, tamanio, symbol)
-        client.futures_create_order(symbol=symbol, side=lado_sl,
-            type="STOP_MARKET", stopPrice=sl_price, closePosition=True)
-        client.futures_create_order(symbol=symbol, side=lado_sl,
-            type="TAKE_PROFIT_MARKET", stopPrice=tp_price, closePosition=True)
-        return oid
     except BinanceAPIException as e:
-        logger.error("Error orden: %s", e)
+        logger.error("Error orden entrada: %s", e)
         return ""
 
+    # 2. SL y TP via Algo Order API
+    base_url = (
+        "https://testnet.binancefuture.com"
+        if excfg.TESTNET
+        else "https://fapi.binance.com"
+    )
+
+    def _algo_order(stop_price: float, tipo: str) -> bool:
+        params = {
+            "symbol":        symbol,
+            "side":          lado_sl,
+            "quantity":      str(tamanio),
+            "triggerprice":  str(stop_price),
+            "price":         str(stop_price),
+            "type":          tipo,
+            "algoType":      "CONDITIONAL",
+            "workingType":   "MARK_PRICE",
+            "reduceOnly":    "true",
+            "timestamp":     str(int(time.time() * 1000)),
+        }
+        query = urllib.parse.urlencode(params)
+        sig   = hmac.new(
+            creds.BINANCE_API_SECRET.encode(),
+            query.encode(),
+            hashlib.sha256
+        ).hexdigest()
+        url = f"{base_url}/fapi/v1/algoOrder?{query}&signature={sig}"
+        req = urllib.request.Request(
+            url,
+            headers={"X-MBX-APIKEY": creds.BINANCE_API_KEY},
+            method="POST"
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10) as r:
+                resp = json.loads(r.read().decode())
+                logger.info("AlgoOrder %s OK: algoId=%s", tipo, resp.get("algoId"))
+                return True
+        except urllib.error.HTTPError as e:
+            logger.error("AlgoOrder %s error %s: %s", tipo, e.code, e.read().decode())
+            return False
+        except Exception as e:
+            logger.error("AlgoOrder %s error: %s", tipo, e)
+            return False
+
+    _algo_order(sl_price, "STOP")
+    _algo_order(tp_price, "TAKE_PROFIT")
+    return oid
 
 def verificar_cierre_live(client, symbol, journal, balance):
     """Verifica si alguno de los trades abiertos se cerró en Binance."""
@@ -292,7 +331,8 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
         return
 
     # Calcular tamanio
-    res     = resumen_riesgo(balance, senal.precio_entrada, senal.stop_loss, senal.take_profit)
+    res = resumen_riesgo(balance, senal.precio_entrada, senal.stop_loss, 
+                     senal.take_profit, excfg.SYMBOL)
     tamanio = res["tamaño"]
 
     logger.info(

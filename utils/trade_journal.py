@@ -99,8 +99,8 @@ class TradeJournal:
     """
 
     def __init__(self, log_dir: Path = None, symbol: str = "BTCUSDT",
-                 timeframe: str = "15m", modo: str = "PAPER",
-                 max_open: int = 1, bot_tag: str = ""):
+             timeframe: str = "15m", modo: str = "PAPER",
+             max_open: int = 1, bot_tag: str = ""):
         from config.settings import logs as lcfg, risk as rcfg, BOT_NUMBER
         self.log_dir    = log_dir or lcfg.LOG_DIR
         self.symbol     = symbol
@@ -112,13 +112,15 @@ class TradeJournal:
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
         self._fecha           = datetime.now().strftime("%Y%m%d")
-        self._trades_abiertos: list[TradeLog] = []   # Lista de trades abiertos
+        self._trades_abiertos: list[TradeLog] = []
         self._trade_counter   = self._contar_trades_hoy()
-        self._racha_sl        = 0    # SL consecutivos
+        self._racha_sl        = 0
+
+        # Restaurar trades abiertos que quedaron en disco al reiniciar
+        self._restaurar_trades_abiertos()
 
         logger.info("[%s] TradeJournal iniciado | Modo: %s | Max open: %d | Dir: %s",
-                    bot_tag or "Bot1", modo, self.max_open, self.log_dir)
-
+                bot_tag or "Bot1", modo, self.max_open, self.log_dir)
     # ── Paths de archivos ──────────────────────────────────
 
     @property
@@ -455,6 +457,22 @@ class TradeJournal:
         }
 
     # ── I/O interno ────────────────────────────────────────
+    def _restaurar_trades_abiertos(self):
+        """Al iniciar, recarga desde disco los trades que quedaron ABIERTOS."""
+        data = self._leer_json(self._trades_path)
+        restaurados = 0
+        for t in data:
+            if t.get("resultado") == "ABIERTO":
+                try:
+                    trade = TradeLog(**t)
+                    self._trades_abiertos.append(trade)
+                    restaurados += 1
+                except Exception as e:
+                    logger.warning("No se pudo restaurar trade %s: %s", t.get("id"), e)
+        if restaurados:
+            logger.warning(
+                "[%s] ⚠️  %d trade(s) ABIERTO(s) restaurados desde disco al reiniciar.",
+                self.bot_tag, restaurados)
 
     def _append_json(self, path: Path, entry: dict):
         """Agrega un entry al array JSON del archivo."""

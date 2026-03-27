@@ -11,9 +11,19 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+# Mapa de precisión por símbolo (stepSize de Binance Futures)
+_STEP_SIZE = {
+    "ETHUSDT": 3,
+    "BTCUSDT": 3,
+    "SOLUSDT": 1,  # ejemplo
+}
+_DEFAULT_DECIMALS = 3
+
+def _decimales_cantidad(symbol: str) -> int:
+    return _STEP_SIZE.get(symbol.upper(), _DEFAULT_DECIMALS)
 
 def calcular_tamaño(capital: float, precio: float,
-                    stop_loss: float) -> float:
+                    stop_loss: float, symbol: str = "ETHUSDT") -> float:
     """
     Calcula el tamaño de posición en unidades base (BTC, ETH, etc.)
     usando riesgo fijo por operación.
@@ -43,7 +53,7 @@ def calcular_tamaño(capital: float, precio: float,
         "Tamaño calculado: %.6f | Riesgo: $%.2f | Dist SL: $%.2f",
         tamaño, riesgo_usd, distancia
     )
-    return round(tamaño, 6)
+    return round(tamaño, _decimales_cantidad(symbol))
 
 
 def nocional(tamaño: float, precio: float) -> float:
@@ -84,7 +94,8 @@ def verificar_limite_diario(perdida_dia: float, capital: float) -> bool:
 
 
 def resumen_riesgo(capital: float, precio: float,
-                   stop_loss: float, take_profit: float) -> dict:
+                   stop_loss: float, take_profit: float,
+                   symbol: str = "ETHUSDT") -> dict:
     """Retorna un dict con el resumen de riesgo de una operación."""
     tamaño    = calcular_tamaño(capital, precio, stop_loss)
     riesgo    = abs(precio - stop_loss) * tamaño
