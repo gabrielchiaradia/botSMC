@@ -452,6 +452,7 @@ class BacktestEngine:
                 señal   = señal,
                 swings  = self.swings,
                 atr     = self.atr,
+                precio  = self.df["close"].iloc[i]
             )
             pasa, motivos_filtro = self.perfil.apply(ctx)
             if not pasa:
