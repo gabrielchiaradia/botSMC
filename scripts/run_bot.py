@@ -432,18 +432,35 @@ def mostrar_resumen(journal, modo, notifier):
 # ══════════════════════════════════════════════════════════
 def reconciliar_posiciones(client, journal, balance):
     """
-    Al iniciar, compara posiciones abiertas en Binance contra el journal.
-    Si hay una posición en Binance que el journal no conoce (trade manual
-    o posición huérfana tras crash), la registra automáticamente.
+    Al iniciar, sincroniza el journal contra Binance (fuente de verdad).
+    1. Marca como CANCELADO los trades ABIERTOS del journal que no existen en Binance.
+    2. Registra posiciones de Binance que el journal no conoce.
     """
     try:
         posiciones = client.futures_position_information(symbol=excfg.SYMBOL)
-        for p in posiciones:
-            amt = float(p["positionAmt"])
-            if amt == 0:
-                continue
-            direccion = "LONG" if amt > 0 else "SHORT"
-            # Verificar si ya está registrada en el journal
+        # Posiciones reales en Binance para este símbolo
+        pos_reales = {
+            ("LONG" if float(p["positionAmt"]) > 0 else "SHORT"): p
+            for p in posiciones
+            if float(p["positionAmt"]) != 0
+        }
+
+        # 1. Limpiar trades fantasma del journal
+        for t in journal.trades_abiertos():
+            if t.direccion not in pos_reales:
+                logger.warning(
+                    "[%s] ⚠️  Trade fantasma eliminado: %s @ $%.2f — no existe en Binance.",
+                    BOT_TAG, t.direccion, t.precio_entrada
+                )
+                journal.cerrar_trade(
+                    precio_salida = t.precio_entrada,  # PnL = 0
+                    capital_out   = balance,
+                    motivo_cierre = "CANCELADO",
+                    trade         = t,
+                )
+
+        # 2. Registrar posiciones de Binance no conocidas por el journal
+        for direccion, p in pos_reales.items():
             ya_registrada = any(
                 t.direccion == direccion
                 for t in journal.trades_abiertos()
@@ -451,10 +468,12 @@ def reconciliar_posiciones(client, journal, balance):
             if not ya_registrada:
                 logger.warning(
                     "[%s] ⚠️  Posición en Binance no registrada: %s %.3f @ $%s — registrando.",
-                    BOT_TAG, direccion, abs(amt), p["entryPrice"]
+                    BOT_TAG, direccion, abs(float(p["positionAmt"])), p["entryPrice"]
                 )
                 journal.registrar_posicion_externa(p, balance)
-                exportar_posiciones_abiertas(journal)
+
+        exportar_posiciones_abiertas(journal)
+
     except Exception as e:
         logger.error("Error reconciliando posiciones con Binance: %s", e)
 
