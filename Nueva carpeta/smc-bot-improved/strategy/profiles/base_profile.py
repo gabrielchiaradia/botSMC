@@ -42,8 +42,7 @@ class FilterContext:
     # Opcionales: disponibles si el perfil los necesita
     df_htf:     pd.DataFrame = field(default_factory=pd.DataFrame)  # Velas HTF
     obs_full:   list = field(default_factory=list)   # OBs detectados en la ventana
-    precio:     float
-    
+
     @property
     def precio(self) -> float:
         return float(self.df["close"].iloc[self.idx])

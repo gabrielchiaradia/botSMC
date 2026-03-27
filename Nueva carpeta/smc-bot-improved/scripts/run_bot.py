@@ -6,36 +6,24 @@ Bot completo con:
   - WebSocket en tiempo real (reacciona al cierre de cada vela)
   - Notificaciones Telegram
   - Journal completo de señales y trades
-  - Multi-bot: --bot-number N carga .envN
 
 Uso:
-    python scripts/run_bot.py               # Paper trading (Bot 1, .env)
+    python scripts/run_bot.py               # Paper trading
     python scripts/run_bot.py --live        # Órdenes en Testnet
-    python scripts/run_bot.py --bot-number 2  # Bot 2, carga .env2
+    python scripts/run_bot.py --poll        # Forzar polling (sin WebSocket)
 """
 
 import sys
-import os
 import time
 import argparse
 import json
-import websocket
 from pathlib import Path
-
-# ── Pre-parsear --bot-number ANTES de importar config ────────────────────
-# Esto permite que config/settings.py lea la variable BOT_NUMBER
-# y cargue el .env correcto.
-_pre_parser = argparse.ArgumentParser(add_help=False)
-_pre_parser.add_argument("--bot-number", type=int, default=None)
-_pre_args, _ = _pre_parser.parse_known_args()
-if _pre_args.bot_number is not None:
-    os.environ["BOT_NUMBER"] = str(_pre_args.bot_number)
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from datetime import datetime
 
-from config import creds, exchange as excfg, mtf as mcfg, ws as wscfg, BOT_TAG, BOT_NUMBER
-from config.settings import logs as lcfg, strategy as scfg
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from config import creds, exchange as excfg, mtf as mcfg, ws as wscfg
+from config.settings import logs as lcfg
 from data import (
     crear_cliente_futures,
     obtener_velas,
@@ -63,8 +51,6 @@ def parse_args():
                    help="Ejecutar ordenes reales en Testnet")
     p.add_argument("--poll", action="store_true",
                    help="Usar polling REST en lugar de WebSocket")
-    p.add_argument("--bot-number", type=int, default=1,
-                   help="Número de bot (1=.env, 2=.env2, etc.)")
     return p.parse_args()
 
 
@@ -75,16 +61,12 @@ def ejecutar_orden_entrada(client, senal, tamanio, symbol) -> str:
     from binance.exceptions import BinanceAPIException
     lado    = "BUY"  if senal.direccion == "ALCISTA" else "SELL"
     lado_sl = "SELL" if lado == "BUY" else "BUY"
-    
+
     # Redondear para cumplir con precisión de Binance
-    if symbol == "ETHUSDT":
-        tamanio = round(tamanio, 3)  # ETH: 3 decimales
-        sl_price = round(senal.stop_loss, 2)
-        tp_price = round(senal.take_profit, 2)
-    else:
-        tamanio = round(tamanio, 2)  # BTC: 3 decimales
-        sl_price = round(senal.stop_loss, 1)
-        tp_price = round(senal.take_profit, 1)
+    tamanio = round(tamanio, 3)  # ETH: 3 decimales
+    sl_price = round(senal.stop_loss, 2)
+    tp_price = round(senal.take_profit, 2)
+
     try:
         orden = client.futures_create_order(
             symbol=symbol, side=lado, type="MARKET", quantity=tamanio
@@ -107,7 +89,7 @@ def verificar_cierre_live(client, symbol, journal, balance):
     if not journal.hay_trade_abierto() or not client:
         return cerrados
     try:
-        posiciones = client.futures_position_information(symbol=symbol)
+        posiciones = client.futures_get_position_risk(symbol=symbol)
         pos_amt = 0
         mark_price = 0
         for p in posiciones:
@@ -162,7 +144,7 @@ def simular_cierre_paper(df, journal, balance):
 #  LOGICA CENTRAL DE ANALISIS
 # ══════════════════════════════════════════════════════════
 def procesar_velas(df_ltf, df_htf, client, modo_live,
-                   journal, notifier, balance_ref, perfil=None):
+                   journal, notifier, balance_ref):
     """
     Llamado por WebSocket (al cierre de vela) o por el loop de polling.
     Soporta múltiples trades simultáneos.
@@ -217,69 +199,46 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
         journal.registrar_señal(senal, balance, "SIN_SEÑAL")
         return
 
-    # Filtro de perfil (ob_bos, ema_filter, etc.)
-    if perfil is not None:
-        from strategy.profiles.base_profile import FilterContext
-        from strategy.indicators import detectar_swings, calcular_atr
-        swings = detectar_swings(df_ltf)
-        atr = calcular_atr(df_ltf)
-        ctx = FilterContext(
-            df      = df_ltf,
-            idx     = len(df_ltf) - 1,
-            señal   = señal,
-            swings  = swings,
-            atr     = atr,
-        )
-        pasa, motivos_filtro = perfil.apply(ctx)
-        if not pasa:
-            motivo = motivos_filtro[-1] if motivos_filtro else "Perfil"
-            logger.info("Señal filtrada por perfil '%s': %s", perfil.nombre, motivo)
-            journal.registrar_señal(señal, balance, f"FILTRO_{perfil.nombre.upper()}")
-            return
-        # Agregar motivos del perfil a la señal
-        señal.motivos.extend(m for m in motivos_filtro if m and m not in señal.motivos)
-
     # Filtro ventana horaria: señal válida pero fuera de horario
-    if señal.fuera_de_horario:
-        logger.warning(f"DEBUG: {señal.ticker} | Hora Señal (UTC): {señal.timestamp.hour:02d}:00 | Ventana: {señal.ventana} | Fuera de Horario: {señal.fuera_de_horario}")
+    if senal.fuera_de_horario:
         logger.info("⏰ Señal %s fuera de horario (%s). Registrando sin operar.",
-                    señal.direccion, señal.ventana)
-        journal.registrar_señal(señal, balance, "FUERA_DE_HORARIO")
+                    senal.direccion, senal.ventana)
+        journal.registrar_señal(senal, balance, "FUERA_DE_HORARIO")
         # Notificar por Telegram para tracking
-        notifier.señal_detectada(señal, balance, 0, 0,
+        notifier.señal_detectada(senal, balance, 0, 0,
                                   "⏰ FUERA DE HORARIO — no operada")
         return
 
     # Calcular tamanio
-    res     = resumen_riesgo(balance, señal.precio_entrada, señal.stop_loss, señal.take_profit)
+    res     = resumen_riesgo(balance, senal.precio_entrada, senal.stop_loss, senal.take_profit)
     tamanio = res["tamaño"]
 
     logger.info(
-        "señal %s | E: $%.2f SL: $%.2f TP: $%.2f | "
+        "SENAL %s | E: $%.2f SL: $%.2f TP: $%.2f | "
         "Tam: %.5f | Riesgo: $%.2f | RR: 1:%.1f",
-        señal.direccion, señal.precio_entrada, señal.stop_loss, señal.take_profit,
+        senal.direccion, senal.precio_entrada, senal.stop_loss, senal.take_profit,
         tamanio, res["riesgo_usd"], res["rr_ratio"],
     )
 
-    if not validar_tamaño(tamanio, señal.precio_entrada):
+    if not validar_tamaño(tamanio, senal.precio_entrada):
         logger.warning("Tamanio invalido, ignorada.")
-        journal.registrar_señal(señal, balance, "TAMANIO_INVALIDO", tamanio)
+        journal.registrar_señal(senal, balance, "TAMANIO_INVALIDO", tamanio)
         return
 
     # Ejecutar
     if modo_live and client:
-        orden_id = ejecutar_orden_entrada(client, señal, tamanio, excfg.SYMBOL)
+        orden_id = ejecutar_orden_entrada(client, senal, tamanio, excfg.SYMBOL)
         accion   = "ENTRADA"
     else:
         orden_id = ""
         accion   = "PAPER_ENTRADA"
         logger.info("PAPER — orden simulada.")
 
-    journal.registrar_señal(señal, balance, accion, tamanio,
+    journal.registrar_señal(senal, balance, accion, tamanio,
                             res["riesgo_usd"], res["rr_ratio"], orden_id)
-    journal.abrir_trade(señal, tamanio, balance, orden_id)
+    journal.abrir_trade(senal, tamanio, balance, orden_id)
 
-    notifier.señal_detectada(señal, balance, tamanio, res["riesgo_usd"],
+    notifier.señal_detectada(senal, balance, tamanio, res["riesgo_usd"],
                               "LIVE" if modo_live else "PAPER")
 
     if not modo_live:
@@ -298,32 +257,13 @@ def exportar_dashboard(journal):
     datos = journal.exportar_como_backtest()
     if not datos:
         return
-    # Agregar bot_tag al export para que el dashboard lo muestre
-    datos["bot_tag"] = journal.bot_tag
     lcfg.LOG_DIR.mkdir(parents=True, exist_ok=True)
-    suffix = f"_{journal._bot_num}" if journal._bot_num > 1 else ""
-    path = lcfg.LOG_DIR / f"dashboard_trades{suffix}_{datetime.now().strftime('%Y%m%d')}.json"
+    path = lcfg.LOG_DIR / f"dashboard_trades_{datetime.now().strftime('%Y%m%d')}.json"
     try:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(datos, f, ensure_ascii=False, indent=2, default=str)
     except OSError as e:
         logger.warning("No se pudo exportar dashboard: %s", e)
-
-    # Exportar posiciones abiertas
-    exportar_posiciones_abiertas(journal)
-
-
-def exportar_posiciones_abiertas(journal):
-    """Escribe las posiciones abiertas actuales a un JSON para el dashboard."""
-    lcfg.LOG_DIR.mkdir(parents=True, exist_ok=True)
-    suffix = f"_{journal._bot_num}" if journal._bot_num > 1 else ""
-    path = lcfg.LOG_DIR / f"open_positions{suffix}.json"
-    try:
-        datos = journal.exportar_posiciones_abiertas()
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(datos, f, ensure_ascii=False, indent=2, default=str)
-    except OSError as e:
-        logger.warning("No se pudo exportar posiciones abiertas: %s", e)
 
 
 # ══════════════════════════════════════════════════════════
@@ -357,37 +297,18 @@ def main():
     from config import risk as rcfg
 
     print(f"\n{'='*60}")
-    print(f"{'  SMC BOT v2 — ' + BOT_TAG:^60}")
+    print(f"{'  SMC BOT v2':^60}")
     print(f"{'='*60}")
-    print(f"  Bot:        #{BOT_NUMBER} ({BOT_TAG})")
     print(f"  Par:        {excfg.SYMBOL}")
-    if mcfg.ENABLED:
-        print(f"  LTF:        {mcfg.LTF}  (entrada)")
-        print(f"  HTF:        {mcfg.HTF}  (contexto)")
-    else:
-        print(f"  Timeframe:  {excfg.TIMEFRAME}")
+    print(f"  LTF:        {mcfg.LTF}  (entrada)")
+    print(f"  HTF:        {mcfg.HTF}  (contexto)")
     print(f"  Modo:       {modo}")
     print(f"  Stream:     {'WebSocket' if usar_ws else 'Polling REST'}")
     print(f"  MTF:        {'ON' if mcfg.ENABLED else 'OFF'}")
     print(f"  Max trades: {rcfg.MAX_OPEN_TRADES}")
     print(f"  RR:         1:{rcfg.TP_RR_RATIO}")
     print(f"  Riesgo:     {rcfg.RISK_PER_TRADE*100:.1f}% por trade")
-    print(f"  Estrategia: {scfg.STRATEGY}")
-    if rcfg.BOT_CAPITAL > 0:
-        print(f"  Capital:    ${rcfg.BOT_CAPITAL:,.0f} USDT (asignado)")
     print(f"{'='*60}\n")
-
-    # ── Cargar perfil de estrategia ───────────────────────
-    perfil = None
-    if scfg.STRATEGY != "base":
-        try:
-            from strategy.profiles import get_profile
-            perfil = get_profile(scfg.STRATEGY)
-            logger.info("[%s] Perfil cargado: %s — %s",
-                        BOT_TAG, perfil.nombre, perfil.descripcion)
-        except Exception as e:
-            logger.warning("No se pudo cargar perfil '%s': %s. Usando base.",
-                           scfg.STRATEGY, e)
 
     # ── Conectar exchange ─────────────────────────────────
     client = None
@@ -401,21 +322,12 @@ def main():
 
     # ── Servicios ─────────────────────────────────────────
     journal  = TradeJournal(symbol=excfg.SYMBOL, timeframe=mcfg.LTF, modo=modo,
-                            max_open=rcfg.MAX_OPEN_TRADES, bot_tag=BOT_TAG)
-    notifier = crear_notifier(bot_tag=BOT_TAG)
+                            max_open=rcfg.MAX_OPEN_TRADES)
+    notifier = crear_notifier()
+    balance_ref = [obtener_balance_usdt(client) if client else 1000.0]
+    logger.info("Balance inicial: $%.2f USDT", balance_ref[0])
 
-    # Capital: usar BOT_CAPITAL del .env si está seteado, sino balance real
-    balance_real = obtener_balance_usdt(client) if client else 1000.0
-    if rcfg.BOT_CAPITAL > 0:
-        balance_ref = [rcfg.BOT_CAPITAL]
-        logger.info("[%s] Capital asignado: $%.2f USDT (balance real: $%.2f)",
-                    BOT_TAG, rcfg.BOT_CAPITAL, balance_real)
-    else:
-        balance_ref = [balance_real]
-        logger.info("[%s] Balance inicial: $%.2f USDT", BOT_TAG, balance_ref[0])
-
-    notifier.bot_iniciado(excfg.SYMBOL, mcfg.LTF, mcfg.HTF, modo, balance_ref[0],
-                          mtf_enabled=mcfg.ENABLED)
+    notifier.bot_iniciado(excfg.SYMBOL, mcfg.LTF, mcfg.HTF, modo, balance_ref[0])
 
     # ── Pre-cargar datos historicos ───────────────────────
     logger.info("Pre-cargando datos historicos...")
@@ -437,7 +349,7 @@ def main():
         if usar_ws:
             def on_señal(df_ltf, df_htf):
                 procesar_velas(df_ltf, df_htf, client, args.live,
-                               journal, notifier, balance_ref, perfil)
+                               journal, notifier, balance_ref)
 
             stream = MTFStream(
                 symbol     = excfg.SYMBOL,
@@ -467,7 +379,7 @@ def main():
                     df_htf = obtener_velas(client, excfg.SYMBOL, mcfg.HTF,
                                            limit=mcfg.HTF_CANDLES)
                     procesar_velas(df_ltf, df_htf, client, args.live,
-                                   journal, notifier, balance_ref, perfil)
+                                   journal, notifier, balance_ref)
                 except Exception as e:
                     logger.error("Error en ciclo %d: %s", ciclo_n, e, exc_info=True)
                     notifier.error_critico(str(e))

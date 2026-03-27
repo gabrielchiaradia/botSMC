@@ -1,0 +1,3 @@
+# Interactive backtest run 20260326_094504
+# 1 resultados
+C:\Users\Gabriel\Documents\smc-bot-improved\backtest\results\bt_ethusdt_15m_base_none_180d_mt3_w11-18_rr2.5.json
