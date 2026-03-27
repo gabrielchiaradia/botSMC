@@ -434,9 +434,9 @@ def reconciliar_posiciones(client, journal, balance):
     """
     Sincroniza el journal contra Binance al iniciar.
     - Limpia trades fantasma (están en journal pero no en Binance)
-    - Restaura posiciones propias huérfanas (están en open_positions.json
-      y en Binance, pero el journal las perdió por crash)
-    - Ignora posiciones manuales o de otros bots
+    - Restaura posiciones propias huérfanas usando open_positions{suffix}.json
+      como fuente de verdad — ese archivo solo lo escribe este bot,
+      por lo que no hay riesgo de registrar trades de otros bots o manuales
     """
     try:
         posiciones = client.futures_position_information(symbol=excfg.SYMBOL)
@@ -460,17 +460,17 @@ def reconciliar_posiciones(client, journal, balance):
                     trade         = t,
                 )
 
-        # 2. Restaurar posiciones propias huérfanas desde open_positions.json
+        # 2. Restaurar huérfanas desde open_positions{suffix}.json
+        # Este archivo solo lo escribe este bot → fuente de verdad segura
         from config.settings import logs as lcfg
-        suffix = f"_{BOT_NUMBER}" if BOT_NUMBER > 1 else ""
+        import json as _json
+        suffix  = f"_{BOT_NUMBER}" if BOT_NUMBER > 1 else ""
         op_path = lcfg.LOG_DIR / f"open_positions{suffix}.json"
 
         if op_path.exists():
-            import json as _json
             op_data = _json.loads(op_path.read_text())
             for pos in op_data.get("posiciones", []):
                 direccion = pos["direccion"]
-                entry     = float(pos["precio_entrada"])
 
                 # ¿Ya está en el journal?
                 ya_en_journal = any(
@@ -480,24 +480,17 @@ def reconciliar_posiciones(client, journal, balance):
                 if ya_en_journal:
                     continue
 
-                # ¿Existe en Binance?
+                # ¿Sigue abierta en Binance?
                 if direccion not in pos_reales:
-                    continue
-
-                # ¿El precio de entrada coincide (tolerancia 2%)?
-                binance_entry = float(pos_reales[direccion]["entryPrice"])
-                tolerancia = abs(entry - binance_entry) / binance_entry
-                if tolerancia > 0.02:
                     logger.warning(
-                        "[%s] Posición en Binance no coincide con open_positions "
-                        "(entry $%.2f vs $%.2f) — ignorando.",
-                        BOT_TAG, entry, binance_entry
+                        "[%s] Posición propia (%s @ $%.2f) ya no existe en Binance — ignorando.",
+                        BOT_TAG, direccion, pos["precio_entrada"]
                     )
                     continue
 
                 logger.warning(
                     "[%s] ⚠️  Posición propia huérfana restaurada: %s @ $%.2f",
-                    BOT_TAG, direccion, entry
+                    BOT_TAG, direccion, pos["precio_entrada"]
                 )
                 journal.registrar_posicion_externa(pos_reales[direccion], balance)
 
