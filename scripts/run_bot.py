@@ -201,15 +201,24 @@ def simular_cierre_paper(df, journal, balance):
 # ══════════════════════════════════════════════════════════
 #  TRACKING DE HORARIO OPERATIVO
 # ══════════════════════════════════════════════════════════
-_en_horario_operativo = False
 
 def chequear_horario_operativo(notifier, balance):
     global _en_horario_operativo
     from strategy.indicators import en_ventana_horaria
-    from datetime import datetime
+    from datetime import datetime, timezone
 
-    ahora = pd.Timestamp(datetime.now())
-    dentro = en_ventana_horaria(ahora)
+    # 1. Forzamos la obtención de la hora actual en UTC
+    ahora_utc = datetime.now(timezone.utc)
+    
+    # 2. Convertimos a Timestamp de Pandas sin zona horaria para la comparación
+    # Esto asegura que si son las 16:45 UTC, el bot compare contra el 16 de tu config
+    ahora_pd = pd.Timestamp(ahora_utc.replace(tzinfo=None))
+
+    # 3. Validamos si estamos dentro del rango (ej. 13-16)
+    dentro = en_ventana_horaria(ahora_pd)
+
+    # Log de diagnóstico para auditoría en tiempo real
+    logger.info(f"🕒 Validando Horario: UTC={ahora_pd.strftime('%H:%M')} | ¿Dentro de ventana?: {dentro}")
 
     if dentro and not _en_horario_operativo:
         _en_horario_operativo = True
@@ -219,7 +228,7 @@ def chequear_horario_operativo(notifier, balance):
             f"🟢 *INICIO HORARIO OPERATIVO*\n"
             f"Ventana: `{windows}` UTC\n"
             f"Balance: `${balance:,.2f}` USDT\n"
-            f"🕐 `{ahora.strftime('%Y-%m-%d %H:%M')} Local`"
+            f"🕐 `{ahora_pd.strftime('%H:%M')} UTC / {ahora_utc.astimezone().strftime('%H:%M')} Local`"
         )
         logger.info("🟢 Inicio horario operativo: %s UTC", windows)
 
@@ -231,7 +240,7 @@ def chequear_horario_operativo(notifier, balance):
             f"🔴 *FIN HORARIO OPERATIVO*\n"
             f"Ventana: `{windows}` UTC cerrada\n"
             f"Balance: `${balance:,.2f}` USDT\n"
-            f"🕐 `{ahora.strftime('%Y-%m-%d %H:%M')} Local`"
+            f"🕐 `{ahora_pd.strftime('%H:%M')} UTC / {ahora_utc.astimezone().strftime('%H:%M')} Local`"
         )
         logger.info("🔴 Fin horario operativo: %s UTC", windows)
 
