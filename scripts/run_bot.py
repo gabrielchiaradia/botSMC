@@ -202,6 +202,8 @@ def simular_cierre_paper(df, journal, balance):
 #  TRACKING DE HORARIO OPERATIVO
 # ══════════════════════════════════════════════════════════
 
+_en_horario_operativo = False
+
 def chequear_horario_operativo(notifier, balance):
     global _en_horario_operativo
     from strategy.indicators import en_ventana_horaria
