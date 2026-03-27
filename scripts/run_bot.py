@@ -244,17 +244,20 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
     Llamado por WebSocket (al cierre de vela) o por el loop de polling.
     Soporta múltiples trades simultáneos.
     """
-    balance = obtener_balance_usdt(client) if client else balance_ref[0]
-   
+    # balance_real: solo para verificar cierres en Binance
+    # capital: capital asignado al bot (BOT_CAPITAL), usado para riesgo y journal
+    balance_real = obtener_balance_usdt(client) if client else balance_ref[0]
+    capital = balance_ref[0]
+
     # Chequear inicio/fin de horario operativo
-    chequear_horario_operativo(notifier, balance)
+    chequear_horario_operativo(notifier, capital)
 
     # Verificar cierre de posiciones abiertas
     trades_cerrados = []
     if modo_live and journal.hay_trade_abierto():
-        trades_cerrados = verificar_cierre_live(client, excfg.SYMBOL, journal, balance)
+        trades_cerrados = verificar_cierre_live(client, excfg.SYMBOL, journal, capital)
     elif not modo_live and journal.hay_trade_abierto():
-        trades_cerrados = simular_cierre_paper(df_ltf, journal, balance)
+        trades_cerrados = simular_cierre_paper(df_ltf, journal, capital)
 
     for tc in trades_cerrados:
         notifier.trade_cerrado(tc, tc.motivo_cierre)
@@ -294,7 +297,7 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
 
     if not senal.tiene_señal:
         logger.info("Sin senal. %s", " | ".join(senal.motivos) or "ninguno")
-        journal.registrar_señal(senal, balance, "SIN_SEÑAL")
+        journal.registrar_señal(senal, capital, "SIN_SEÑAL")
         return
 
     # Filtro de perfil (ob_bos, ema_filter, etc.)
@@ -314,7 +317,7 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
         if not pasa:
             motivo = motivos_filtro[-1] if motivos_filtro else "Perfil"
             logger.info("Señal filtrada por perfil '%s': %s", perfil.nombre, motivo)
-            journal.registrar_señal(senal, balance, f"FILTRO_{perfil.nombre.upper()}")
+            journal.registrar_señal(senal, capital, f"FILTRO_{perfil.nombre.upper()}")
             return
         # Agregar motivos del perfil a la señal
         senal.motivos.extend(m for m in motivos_filtro if m and m not in senal.motivos)
@@ -324,15 +327,14 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
         logger.warning(f"DEBUG: {senal.ticker} | Hora Señal (UTC): {senal.timestamp.hour:02d}:00 | Ventana: {senal.ventana} | Fuera de Horario: {senal.fuera_de_horario}")
         logger.info("⏰ Señal %s fuera de horario (%s). Registrando sin operar.",
                     senal.direccion, senal.ventana)
-        journal.registrar_señal(senal, balance, "FUERA_DE_HORARIO")
-        # Notificar por Telegram para tracking
-        notifier.señal_detectada(senal, balance, 0, 0,
+        journal.registrar_señal(senal, capital, "FUERA_DE_HORARIO")
+        notifier.señal_detectada(senal, capital, 0, 0,
                                   "⏰ FUERA DE HORARIO — no operada")
         return
 
-    # Calcular tamanio
-    res = resumen_riesgo(balance, senal.precio_entrada, senal.stop_loss, 
-                     senal.take_profit, excfg.SYMBOL)
+    # Calcular tamanio sobre capital asignado
+    res = resumen_riesgo(capital, senal.precio_entrada, senal.stop_loss,
+                         senal.take_profit, excfg.SYMBOL)
     tamanio = res["tamaño"]
 
     logger.info(
@@ -344,7 +346,7 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
 
     if not validar_tamaño(tamanio, senal.precio_entrada):
         logger.warning("Tamanio invalido, ignorada.")
-        journal.registrar_señal(senal, balance, "TAMANIO_INVALIDO", tamanio)
+        journal.registrar_señal(senal, capital, "TAMANIO_INVALIDO", tamanio)
         return
 
     # Ejecutar
@@ -356,20 +358,20 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
         accion   = "PAPER_ENTRADA"
         logger.info("PAPER — orden simulada.")
 
-    journal.registrar_señal(senal, balance, accion, tamanio,
+    journal.registrar_señal(senal, capital, accion, tamanio,
                             res["riesgo_usd"], res["rr_ratio"], orden_id)
-    journal.abrir_trade(senal, tamanio, balance, orden_id)
+    journal.abrir_trade(senal, tamanio, capital, orden_id)
 
-    notifier.señal_detectada(senal, balance, tamanio, res["riesgo_usd"],
+    notifier.señal_detectada(senal, capital, tamanio, res["riesgo_usd"],
                               "LIVE" if modo_live else "PAPER")
 
     if not modo_live:
-        cerrados = simular_cierre_paper(df_ltf, journal, balance)
+        cerrados = simular_cierre_paper(df_ltf, journal, capital)
         for tc in cerrados:
             notifier.trade_cerrado(tc, tc.motivo_cierre)
 
     exportar_dashboard(journal)
-    balance_ref[0] = obtener_balance_usdt(client) if client else balance_ref[0]
+    balance_ref[0] = capital  # mantener capital asignado, no sobreescribir con balance real
 
 
 # ══════════════════════════════════════════════════════════
