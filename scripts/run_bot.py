@@ -428,6 +428,38 @@ def mostrar_resumen(journal, modo, notifier):
 
 
 # ══════════════════════════════════════════════════════════
+#  RECONCILIACION DE POSICIONES
+# ══════════════════════════════════════════════════════════
+def reconciliar_posiciones(client, journal, balance):
+    """
+    Al iniciar, compara posiciones abiertas en Binance contra el journal.
+    Si hay una posición en Binance que el journal no conoce (trade manual
+    o posición huérfana tras crash), la registra automáticamente.
+    """
+    try:
+        posiciones = client.futures_position_information(symbol=excfg.SYMBOL)
+        for p in posiciones:
+            amt = float(p["positionAmt"])
+            if amt == 0:
+                continue
+            direccion = "LONG" if amt > 0 else "SHORT"
+            # Verificar si ya está registrada en el journal
+            ya_registrada = any(
+                t.direccion == direccion
+                for t in journal.trades_abiertos()
+            )
+            if not ya_registrada:
+                logger.warning(
+                    "[%s] ⚠️  Posición en Binance no registrada: %s %.3f @ $%s — registrando.",
+                    BOT_TAG, direccion, abs(amt), p["entryPrice"]
+                )
+                journal.registrar_posicion_externa(p, balance)
+                exportar_posiciones_abiertas(journal)
+    except Exception as e:
+        logger.error("Error reconciliando posiciones con Binance: %s", e)
+
+
+# ══════════════════════════════════════════════════════════
 #  MAIN
 # ══════════════════════════════════════════════════════════
 def main():
@@ -497,6 +529,10 @@ def main():
 
     notifier.bot_iniciado(excfg.SYMBOL, mcfg.LTF, mcfg.HTF, modo, balance_ref[0],
                           mtf_enabled=mcfg.ENABLED)
+
+    # ── Reconciliar posiciones abiertas en Binance ────────
+    if args.live and client:
+        reconciliar_posiciones(client, journal, balance_ref[0])
 
     # ── Pre-cargar datos historicos ───────────────────────
     logger.info("Pre-cargando datos historicos...")

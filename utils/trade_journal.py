@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field, asdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -99,8 +99,8 @@ class TradeJournal:
     """
 
     def __init__(self, log_dir: Path = None, symbol: str = "BTCUSDT",
-             timeframe: str = "15m", modo: str = "PAPER",
-             max_open: int = 1, bot_tag: str = ""):
+                 timeframe: str = "15m", modo: str = "PAPER",
+                 max_open: int = 1, bot_tag: str = ""):
         from config.settings import logs as lcfg, risk as rcfg, BOT_NUMBER
         self.log_dir    = log_dir or lcfg.LOG_DIR
         self.symbol     = symbol
@@ -120,7 +120,8 @@ class TradeJournal:
         self._restaurar_trades_abiertos()
 
         logger.info("[%s] TradeJournal iniciado | Modo: %s | Max open: %d | Dir: %s",
-                bot_tag or "Bot1", modo, self.max_open, self.log_dir)
+                    bot_tag or "Bot1", modo, self.max_open, self.log_dir)
+
     # ── Paths de archivos ──────────────────────────────────
 
     @property
@@ -218,6 +219,38 @@ class TradeJournal:
                     trade.direccion, self.symbol, trade.precio_entrada,
                     trade.stop_loss, trade.take_profit, trade_id,
                     len(self._trades_abiertos), self.max_open)
+        return trade
+
+    def registrar_posicion_externa(self, pos_binance: dict, capital: float) -> TradeLog:
+        """
+        Registra una posición abierta en Binance que no fue abierta por el bot.
+        Útil para trades manuales o posiciones huérfanas tras un crash/reinicio.
+        SL y TP quedan en 0.0 — se deben configurar manualmente si se desea.
+        """
+        from types import SimpleNamespace
+        amt       = float(pos_binance["positionAmt"])
+        direccion = "ALCISTA" if amt > 0 else "BAJISTA"
+
+        senal = SimpleNamespace(
+            direccion      = direccion,
+            precio_entrada = float(pos_binance["entryPrice"]),
+            stop_loss      = 0.0,
+            take_profit    = 0.0,
+            score          = 0,
+            motivos        = ["Posición externa — registrada al iniciar bot"],
+            sesion         = "unknown",
+            atr            = 0.0,
+            tiene_señal    = True,
+            tendencia      = direccion,
+        )
+        trade = self.abrir_trade(senal, abs(amt), capital, orden_id="EXTERNAL")
+        logger.warning(
+            "[%s] ⚠️  Posición externa registrada: %s %.3f @ $%.2f | SL/TP no configurados.",
+            self.bot_tag,
+            "LONG" if amt > 0 else "SHORT",
+            abs(amt),
+            float(pos_binance["entryPrice"]),
+        )
         return trade
 
     def cerrar_trade(self, precio_salida: float, capital_out: float,
@@ -335,7 +368,6 @@ class TradeJournal:
 
     def exportar_posiciones_abiertas(self) -> dict:
         """Exporta las posiciones abiertas actuales como dict para JSON."""
-        from datetime import datetime
         posiciones = []
         for t in self._trades_abiertos:
             posiciones.append({
@@ -457,22 +489,37 @@ class TradeJournal:
         }
 
     # ── I/O interno ────────────────────────────────────────
+
     def _restaurar_trades_abiertos(self):
-        """Al iniciar, recarga desde disco los trades que quedaron ABIERTOS."""
-        data = self._leer_json(self._trades_path)
+        """
+        Al iniciar, recarga desde disco los trades que quedaron ABIERTOS.
+        Busca en el archivo de hoy y también en el de ayer, por si el trade
+        se abrió antes de medianoche o el bot corrió sin reiniciarse varios días.
+        """
+        fechas = [
+            self._fecha,
+            (datetime.now() - timedelta(days=1)).strftime("%Y%m%d"),
+        ]
         restaurados = 0
-        for t in data:
-            if t.get("resultado") == "ABIERTO":
-                try:
-                    trade = TradeLog(**t)
-                    self._trades_abiertos.append(trade)
-                    restaurados += 1
-                except Exception as e:
-                    logger.warning("No se pudo restaurar trade %s: %s", t.get("id"), e)
+        for fecha in fechas:
+            path = self.log_dir / f"trades{self._bot_suffix}_{fecha}.json"
+            data = self._leer_json(path)
+            for t in data:
+                if t.get("resultado") == "ABIERTO":
+                    try:
+                        trade = TradeLog(**t)
+                        self._trades_abiertos.append(trade)
+                        restaurados += 1
+                    except Exception as e:
+                        logger.warning("No se pudo restaurar trade %s: %s", t.get("id"), e)
+            if restaurados:
+                break  # Si encontró trades hoy, no buscar en ayer
+
         if restaurados:
             logger.warning(
                 "[%s] ⚠️  %d trade(s) ABIERTO(s) restaurados desde disco al reiniciar.",
-                self.bot_tag, restaurados)
+                self.bot_tag, restaurados
+            )
 
     def _append_json(self, path: Path, entry: dict):
         """Agrega un entry al array JSON del archivo."""
