@@ -55,6 +55,30 @@ class TelegramNotifier:
     # ══════════════════════════════════════════════════════
     #  MENSAJES PRINCIPALES
     # ══════════════════════════════════════════════════════
+    def señal_fuera_de_horario(self, senal, capital: float) -> bool:
+        """Notifica señal detectada pero NO operada por estar fuera de horario."""
+        dir_emoji = "🟢 LONG" if senal.direccion == "ALCISTA" else "🔴 SHORT"
+
+        texto = (
+            f"⏰ *Señal Fuera de Horario*\n"
+            f"{'─'*28}\n"
+            f"*Dirección:* {dir_emoji}\n"
+            f"*Score:* `{senal.score}/100`\n\n"
+            f"💰 *Niveles (no operados)*\n"
+            f"Entrada:  `${senal.precio_entrada:,.2f}`\n"
+            f"Stop Loss: `${senal.stop_loss:,.2f}`\n"
+            f"Take Profit: `${senal.take_profit:,.2f}`\n\n"
+            f"📊 *Confluencias*\n"
+        )
+        for m in senal.motivos:
+            texto += f"• {m}\n"
+
+        texto += (
+            f"\n⚠️ _No operada — fuera de ventana horaria_\n"
+            f"💰 Capital: `${capital:,.2f} USDT`\n"
+            f"🕐 `{datetime.now().strftime('%Y-%m-%d %H:%M')} Local`"
+        )
+        return self._enviar(texto)
 
     def señal_detectada(self, senal, capital: float,
                          tamanio: float, riesgo_usd: float,
@@ -64,17 +88,16 @@ class TelegramNotifier:
         modo_tag  = "📋 PAPER" if modo == "PAPER" else "⚡ LIVE"
 
         texto = (
-            f"🔔 *Nueva Señal SMC*\n"
+            f"🔔 *Trade Abierto*\n"
             f"{'─'*28}\n"
-            f"*Par:*      `{senal.sesion.upper()} Session`\n"
             f"*Dirección:* {dir_emoji}\n"
             f"*Modo:*     {modo_tag}\n\n"
             f"💰 *Niveles*\n"
-            f"Entrada:  `${senal.precio_entrada:,.2f}`\n"
-            f"Stop Loss: `${senal.stop_loss:,.2f}`\n"
-            f"Take Profit: `${senal.take_profit:,.2f}`\n\n"
-            f"📐 *Riesgo*\n"
-            f"Tamaño:  `{tamanio:.5f} BTC`\n"
+            f"Entrada:    `${senal.precio_entrada:,.2f}`\n"
+            f"Stop Loss:  `${senal.stop_loss:,.2f}`\n"
+            f"Take Profit:`${senal.take_profit:,.2f}`\n\n"
+            f"📐 *Posición*\n"
+            f"Tamaño:  `{tamanio:.4f}`\n"
             f"Riesgo:  `${riesgo_usd:.2f} USDT`\n"
             f"Capital: `${capital:,.2f} USDT`\n\n"
             f"📊 *Confluencias* (score: {senal.score}/100)\n"
@@ -129,23 +152,31 @@ class TelegramNotifier:
         return self._enviar(texto)
 
     def bot_iniciado(self, symbol: str, ltf: str, htf: str,
-                      modo: str, capital: float, mtf_enabled: bool = True) -> bool:
+                      modo: str, capital: float, mtf_enabled: bool = True,
+                      perfil: str = "base", rr: float = 2.0,
+                      max_trades: int = 1, windows: str = "") -> bool:
         """Notifica que el bot arrancó."""
         if mtf_enabled:
             tf_info = (
-                f"LTF:     `{ltf}` (entrada)\n"
-                f"HTF:     `{htf}` (contexto)\n"
+                f"📊 LTF:     `{ltf}` (entrada)\n"
+                f"📊 HTF:     `{htf}` (contexto)\n"
             )
         else:
-            tf_info = f"TF:      `{ltf}`\n"
+            tf_info = f"📊 TF:      `{ltf}`\n"
+
+        win_info = f"⏰ Ventana: `{windows} UTC`\n" if windows else "⏰ Ventana: `24h`\n"
 
         texto = (
             f"🚀 *SMC Bot Iniciado*\n"
             f"{'─'*28}\n"
-            f"Par:     `{symbol}`\n"
+            f"🔹 Par:     `{symbol}`\n"
             f"{tf_info}"
-            f"Modo:    `{'PAPER' if modo == 'PAPER' else '⚡ LIVE'}`\n"
-            f"Capital: `${capital:,.2f} USDT`\n"
+            f"🎯 Perfil:  `{perfil}`\n"
+            f"⚖️ RR:      `1:{rr}`\n"
+            f"📈 Max trades: `{max_trades}`\n"
+            f"{win_info}"
+            f"💼 Modo:    `{'📋 PAPER' if modo == 'PAPER' else '⚡ LIVE'}`\n"
+            f"💰 Capital: `${capital:,.2f} USDT`\n"
             f"🕐 `{datetime.now().strftime('%Y-%m-%d %H:%M')} Local`"
         )
         return self._enviar(texto)
