@@ -339,7 +339,7 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
         logger.info("⏰ Señal %s fuera de horario (%s). Registrando sin operar.",
                     senal.direccion, senal.ventana)
         journal.registrar_señal(senal, capital, "FUERA_DE_HORARIO")
-        notifier.señal_fuera_de_horario(senal, balance)
+        notifier.señal_fuera_de_horario(senal, capital)
         return
 
     # Calcular tamanio sobre capital asignado
@@ -581,7 +581,7 @@ def main():
 
     notifier.bot_iniciado(excfg.SYMBOL, mcfg.LTF, mcfg.HTF, modo, balance_ref[0],
                        mtf_enabled=mcfg.ENABLED,
-                       perfil=perfil_nombre,
+                       perfil=perfil,
                        rr=rcfg.TP_RR_RATIO,
                        max_trades=rcfg.MAX_OPEN_TRADES,
                        windows=scfg.TRADING_WINDOWS_RAW)
