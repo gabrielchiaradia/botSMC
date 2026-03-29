@@ -920,7 +920,7 @@ function mostrarDashboardNormal(data) {
   document.getElementById('dashboard-content').style.display = 'block';
   document.getElementById('kpi-section-live').style.display = 'block';
 
-  // Normalizar campos que pueden venir ausentes en JSON del bot live
+  // Normalizar campos ausentes en JSON del bot live
   data.capital_inicial   = data.capital_inicial   || 1000;
   data.capital_final     = data.capital_final     || data.capital_inicial;
   data.total_trades      = data.total_trades      || 0;
@@ -943,13 +943,12 @@ function mostrarDashboardNormal(data) {
   data.trades_por_sesion = data.trades_por_sesion || {};
   data.trades_por_hora   = data.trades_por_hora   || {};
   data.fecha_inicio      = data.fecha_inicio      || (data.trades[0]?.timestamp_in || new Date().toISOString());
-  data.fecha_fin         = data.fecha_fin         || (data.trades[data.trades.length - 1]?.timestamp_out || new Date().toISOString());
+  data.fecha_fin         = data.fecha_fin         || (data.trades[data.trades.length-1]?.timestamp_out || new Date().toISOString());
 
-  // Usar retorno_pct del JSON si viene (bot live lo calcula bien), sino calcularlo
+  // Usar retorno_pct del JSON si viene (bot live lo calcula), sino calcularlo
   const retPct = data.retorno_pct !== undefined
     ? parseFloat(data.retorno_pct).toFixed(2)
     : ((data.capital_final - data.capital_inicial) / data.capital_inicial * 100).toFixed(2);
-
   document.getElementById('header-period').textContent =
     `${data.fecha_inicio.slice(0,10)} → ${data.fecha_fin.slice(0,10)}`;
   document.getElementById('footer-info').textContent =
@@ -1089,10 +1088,10 @@ function renderKPIs(d, retPct) {
   const kpis = [
     { label:'Capital Final',  value:`$${(d.capital_final||0).toLocaleString('en',{maximumFractionDigits:2})}`, cls: retColor, sub: `Inicial: $${(d.capital_inicial||0).toLocaleString('en')}` },
     { label:'Retorno Total',  value:`${retPct >= 0 ? '+' : ''}${retPct}%`, cls: retColor },
-    { label:'Win Rate',       value:`${d.win_rate||0}%`, cls: kpiColor(d.win_rate||0,{green:55,yellow:45}), sub:`${d.wins||0}W / ${d.losses||0}L` },
-    { label:'Profit Factor',  value:d.profit_factor||0, cls: kpiColor(d.profit_factor||0,{green:1.5,yellow:1.0}), sub:'≥1.5 = bueno' },
+    { label:'Win Rate',       value:`${d.win_rate||0}%`, cls: kpiColor(d.win_rate,{green:55,yellow:45}), sub:`${d.wins||0}W / ${d.losses||0}L` },
+    { label:'Profit Factor',  value:d.profit_factor||0, cls: kpiColor(d.profit_factor,{green:1.5,yellow:1.0}), sub:'≥1.5 = bueno' },
     { label:'Total Trades',   value:d.total_trades||0, cls:'kpi-accent' },
-    { label:'Sharpe Ratio',   value:d.sharpe_ratio||0, cls: kpiColor(d.sharpe_ratio||0,{green:1,yellow:0.5}), sub:'anualizado' },
+    { label:'Sharpe Ratio',   value:d.sharpe_ratio||0, cls: kpiColor(d.sharpe_ratio,{green:1,yellow:0.5}), sub:'anualizado' },
     { label:'Max Drawdown',   value:`${(d.max_drawdown_pct||0).toFixed(1)}%`, cls:'kpi-red', sub:`$${(d.max_drawdown_usd||0).toFixed(0)}` },
     { label:'Avg Win',        value:`$${d.avg_win_usd||0}`, cls:'kpi-green' },
     { label:'Avg Loss',       value:`$${d.avg_loss_usd||0}`, cls:'kpi-red' },
@@ -1617,15 +1616,41 @@ async function renderLiveFiles() {
   lista.innerHTML = '<span class="no-server-files">Buscando...</span>';
 
   const archs = await buscarArchivosLive();
-  renderFileList(lista, archs, 'type-live', 'LIVE',
-    'No hay reportes live todavía.<br>Aparecerán cuando el bot genere trades.');
 
-  // Auto-cargar el más reciente si no hay dashboard activo
-  if (!DATA && archs.length > 0) {
-    await cargarDesdeServidor(archs[0].name, lista.querySelector('.file-btn'));
+  if (archs.length === 0) {
+    lista.innerHTML = '<span class="no-server-files">No hay reportes live todavía.<br>Aparecerán cuando el bot genere trades.</span>';
+    return;
+  }
+
+  // Agrupar por bot number y quedarse con el más reciente de cada uno
+  const porBot = {};
+  for (const a of archs) {
+    const match = a.name.match(/dashboard_trades_?(\d+)?_?(\d{8})\.json/);
+    const botNum = match && match[1] && match[1].length <= 2 ? match[1] : '1';
+    if (!porBot[botNum]) porBot[botNum] = a; // ya vienen ordenados desc
+  }
+
+  // Renderizar un botón por bot
+  const botsSorted = Object.keys(porBot).sort();
+  let html = '<div style="display:flex;flex-wrap:wrap;gap:8px">';
+  for (const botNum of botsSorted) {
+    const a = porBot[botNum];
+    const label = botNum === '1' ? 'SMC Bot 1' : `SMC Bot ${botNum}`;
+    html += `<button class="file-btn" id="bot-btn-${botNum}" onclick="cargarDesdeServidor('${a.name}', this)">
+      <span class="file-type type-live">LIVE</span>
+      ${label}
+    </button>`;
+  }
+  html += '</div>';
+  lista.innerHTML = html;
+
+  // Auto-cargar bot 1 si no hay dashboard activo
+  if (!DATA) {
+    const btn1 = document.getElementById('bot-btn-1');
+    if (btn1) btn1.click();
+    else lista.querySelector('.file-btn')?.click();
   }
 }
-
 async function renderBacktestFiles() {
   if (!EN_SERVIDOR) return;
   document.getElementById('backtest-files-section').style.display = 'block';
