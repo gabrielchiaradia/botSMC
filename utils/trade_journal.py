@@ -411,8 +411,9 @@ class TradeJournal:
         pnls   = [t["pnl_usd"] for t in trades_cerrados]
 
         import numpy as np
-        capital0 = trades_cerrados[0]["capital_in"] if trades_cerrados else 1000.0
+        capital0      = trades_cerrados[0]["capital_in"] if trades_cerrados else 1000.0
         capital_final = trades_cerrados[-1]["capital_out"] if trades_cerrados else capital0
+        retorno_pct   = round((capital_final - capital0) / capital0 * 100, 2) if capital0 > 0 else 0
 
         # Equity curve
         if trades_cerrados:
@@ -460,12 +461,14 @@ class TradeJournal:
             trades_export.append(t_copy)
 
         return {
+            # ── Campos top-level (compatibles con backtest dashboard) ──
             "symbol":            self.symbol,
             "timeframe":         self.timeframe,
             "fecha_inicio":      trades_cerrados[0]["timestamp_in"] if trades_cerrados else "",
             "fecha_fin":         trades_cerrados[-1]["timestamp_out"] if trades_cerrados else "",
             "capital_inicial":   capital0,
             "capital_final":     round(capital_final, 2),
+            "retorno_pct":       retorno_pct,
             "total_trades":      len(trades_cerrados),
             "wins":              len(wins),
             "losses":            len(losses),
@@ -486,6 +489,22 @@ class TradeJournal:
             "trades_por_sesion": por_sesion,
             "trades_por_hora":   por_hora,
             "fuente":            f"bot_en_vivo_{self.modo}",
+            # ── Bloque summary (compatible con live dashboard renderLiveKPIs) ──
+            "summary": {
+                "symbol":          self.symbol,
+                "timeframe":       self.timeframe,
+                "bot":             self.bot_tag,
+                "total":           len(trades_cerrados),
+                "wins":            len(wins),
+                "losses":          len(losses),
+                "winrate":         round(len(wins)/len(trades_cerrados)*100, 2) if trades_cerrados else 0,
+                "profit_factor":   pf,
+                "capital_inicial": capital0,
+                "capital_final":   round(capital_final, 2),
+                "balance_actual":  round(capital_final, 2),
+                "retorno_pct":     retorno_pct,
+                "max_drawdown":    0,
+            },
         }
 
     # ── I/O interno ────────────────────────────────────────
