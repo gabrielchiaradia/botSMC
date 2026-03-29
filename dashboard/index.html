@@ -921,29 +921,29 @@ function mostrarDashboardNormal(data) {
   document.getElementById('kpi-section-live').style.display = 'block';
 
   // Normalizar campos que pueden venir ausentes en JSON del bot live
-  data.capital_inicial  = data.capital_inicial  || 1000;
-  data.capital_final    = data.capital_final    || data.capital_inicial;
-  data.total_trades     = data.total_trades     || 0;
-  data.wins             = data.wins             || 0;
-  data.losses           = data.losses           || 0;
-  data.win_rate         = data.win_rate         || 0;
-  data.profit_factor    = data.profit_factor    || 0;
-  data.sharpe_ratio     = data.sharpe_ratio     || 0;
-  data.max_drawdown_pct = data.max_drawdown_pct || 0;
-  data.max_drawdown_usd = data.max_drawdown_usd || 0;
-  data.avg_win_usd      = data.avg_win_usd      || 0;
-  data.avg_loss_usd     = data.avg_loss_usd     || 0;
-  data.mejor_trade_usd  = data.mejor_trade_usd  || 0;
-  data.peor_trade_usd   = data.peor_trade_usd   || 0;
-  data.avg_duracion_min = data.avg_duracion_min || 0;
-  data.racha_wins       = data.racha_wins       || 0;
-  data.racha_losses     = data.racha_losses     || 0;
-  data.equity_curve     = data.equity_curve     || [];
-  data.trades           = data.trades           || [];
+  data.capital_inicial   = data.capital_inicial   || 1000;
+  data.capital_final     = data.capital_final     || data.capital_inicial;
+  data.total_trades      = data.total_trades      || 0;
+  data.wins              = data.wins              || 0;
+  data.losses            = data.losses            || 0;
+  data.win_rate          = data.win_rate          || 0;
+  data.profit_factor     = data.profit_factor     || 0;
+  data.sharpe_ratio      = data.sharpe_ratio      || 0;
+  data.max_drawdown_pct  = data.max_drawdown_pct  || 0;
+  data.max_drawdown_usd  = data.max_drawdown_usd  || 0;
+  data.avg_win_usd       = data.avg_win_usd       || 0;
+  data.avg_loss_usd      = data.avg_loss_usd      || 0;
+  data.mejor_trade_usd   = data.mejor_trade_usd   || 0;
+  data.peor_trade_usd    = data.peor_trade_usd    || 0;
+  data.avg_duracion_min  = data.avg_duracion_min  || 0;
+  data.racha_wins        = data.racha_wins        || 0;
+  data.racha_losses      = data.racha_losses      || 0;
+  data.equity_curve      = data.equity_curve      || [];
+  data.trades            = data.trades            || [];
   data.trades_por_sesion = data.trades_por_sesion || {};
-  data.trades_por_hora  = data.trades_por_hora  || {};
-  data.fecha_inicio     = data.fecha_inicio     || (data.trades[0]?.timestamp_in  || new Date().toISOString());
-  data.fecha_fin        = data.fecha_fin        || (data.trades[data.trades.length-1]?.timestamp_out || new Date().toISOString());
+  data.trades_por_hora   = data.trades_por_hora   || {};
+  data.fecha_inicio      = data.fecha_inicio      || (data.trades[0]?.timestamp_in || new Date().toISOString());
+  data.fecha_fin         = data.fecha_fin         || (data.trades[data.trades.length - 1]?.timestamp_out || new Date().toISOString());
 
   // Usar retorno_pct del JSON si viene (bot live lo calcula bien), sino calcularlo
   const retPct = data.retorno_pct !== undefined

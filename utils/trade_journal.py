@@ -285,7 +285,10 @@ class TradeJournal:
         t.pnl_pct        = round(pnl_pct, 3)
         t.resultado      = resultado
         t.duracion_min   = dur
-        t.capital_out    = round(capital_out, 2)
+        # capital_out = capital al abrir + PnL de este trade
+        # Usamos capital_in del trade para no depender de balance_ref en memoria
+        # (que puede estar desactualizado si el container se reinició)
+        t.capital_out    = round(t.capital_in + pnl, 2)
         t.motivo_cierre  = motivo_cierre
         t.orden_id_out   = orden_id_out
 
