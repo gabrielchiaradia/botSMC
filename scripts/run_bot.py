@@ -143,33 +143,79 @@ def ejecutar_orden_entrada(client, senal, tamanio, symbol) -> str:
     return oid
 
 def verificar_cierre_live(client, symbol, journal, balance):
-    """Verifica si alguno de los trades abiertos se cerró en Binance."""
+    """Verifica si alguno de los trades abiertos se cerró en Binance.
+    Lee el historial de órdenes para determinar si fue TP o SL."""
     cerrados = []
     if not journal.hay_trade_abierto() or not client:
         return cerrados
     try:
         posiciones = client.futures_position_information(symbol=symbol)
         pos_amt = 0
-        mark_price = 0
         for p in posiciones:
             if p["symbol"] == symbol:
                 pos_amt = float(p["positionAmt"])
-                mark_price = float(p["markPrice"])
                 break
 
         # Si no hay posición en Binance pero hay trades abiertos en el journal
         if pos_amt == 0 and journal.hay_trade_abierto():
+            # Leer órdenes recientes para saber qué se ejecutó
+            try:
+                ordenes = client.futures_get_all_orders(
+                    symbol=symbol, limit=20
+                )
+                # Buscar órdenes condicionales ejecutadas (SL o TP)
+                ordenes_filled = [
+                    o for o in ordenes
+                    if o["status"] == "FILLED"
+                    and o["type"] in ("STOP_MARKET", "TAKE_PROFIT_MARKET",
+                                      "STOP", "TAKE_PROFIT",
+                                      "TRAILING_STOP_MARKET")
+                    and o["reduceOnly"] == True
+                ]
+            except Exception as e:
+                logger.warning("No se pudieron leer órdenes: %s", e)
+                ordenes_filled = []
+
             for t in journal.trades_abiertos():
+                # Buscar la orden que cerró este trade
+                motivo = "SL"  # Default conservador
+                precio_cierre = t.stop_loss
+
+                for o in ordenes_filled:
+                    o_time = int(o.get("updateTime", 0))
+                    o_price = float(o.get("avgPrice", 0)) or float(o.get("stopPrice", 0))
+                    o_type = o.get("type", "")
+
+                    # La orden debe ser posterior a la apertura del trade
+                    from datetime import datetime
+                    trade_in_ms = int(datetime.fromisoformat(t.timestamp_in).timestamp() * 1000)
+                    if o_time <= trade_in_ms:
+                        continue
+
+                    if "TAKE_PROFIT" in o_type:
+                        motivo = "TP"
+                        precio_cierre = o_price if o_price > 0 else t.take_profit
+                        break
+                    elif "STOP" in o_type:
+                        motivo = "SL"
+                        precio_cierre = o_price if o_price > 0 else t.stop_loss
+                        break
+
+                # Calcular PnL real
                 if t.direccion == "LONG":
-                    motivo = "TP" if mark_price >= t.take_profit * 0.999 else "SL"
-                    pc = t.take_profit if motivo == "TP" else t.stop_loss
+                    pnl = (precio_cierre - t.precio_entrada) * t.tamaño
                 else:
-                    motivo = "TP" if mark_price <= t.take_profit * 1.001 else "SL"
-                    pc = t.take_profit if motivo == "TP" else t.stop_loss
-                trade_cerrado = journal.cerrar_trade(pc, balance, motivo, trade=t)
+                    pnl = (t.precio_entrada - precio_cierre) * t.tamaño
+
+                nuevo_balance = round(balance + pnl, 2)
+                trade_cerrado = journal.cerrar_trade(
+                    precio_cierre, nuevo_balance, motivo, trade=t
+                )
                 if trade_cerrado:
                     cerrados.append(trade_cerrado)
                     exportar_dashboard(journal)
+                    balance = nuevo_balance
+
     except Exception as e:
         logger.warning("No se pudo verificar posicion: %s", e)
     return cerrados
@@ -273,6 +319,9 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
     for tc in trades_cerrados:
         notifier.trade_cerrado(tc, tc.motivo_cierre)
         exportar_dashboard(journal)
+        # Actualizar capital con PnL real
+        balance_ref[0] = round(balance_ref[0] + tc.pnl_usd, 2)
+        logger.info("Capital actualizado: $%.2f (PnL: $%+.2f)", balance_ref[0], tc.pnl_usd)
 
     # Mostrar estado de posiciones abiertas
     if journal.hay_trade_abierto():
@@ -381,7 +430,6 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
             notifier.trade_cerrado(tc, tc.motivo_cierre)
 
     exportar_dashboard(journal)
-    balance_ref[0] = capital  # mantener capital asignado, no sobreescribir con balance real
 
 
 # ══════════════════════════════════════════════════════════
