@@ -619,9 +619,12 @@ def main():
     # Capital: usar BOT_CAPITAL del .env si está seteado, sino balance real
     balance_real = obtener_balance_usdt(client) if client else 1000.0
     if rcfg.BOT_CAPITAL > 0:
-        balance_ref = [rcfg.BOT_CAPITAL]
-        logger.info("[%s] Capital asignado: $%.2f USDT (balance real: $%.2f)",
-                    BOT_TAG, rcfg.BOT_CAPITAL, balance_real)
+        # Recuperar capital acumulado del journal si hay trades cerrados hoy.
+        # Asi al reiniciar el container no se pierde el PnL del dia.
+        capital_recuperado = journal.recuperar_capital_hoy(rcfg.BOT_CAPITAL)
+        balance_ref = [capital_recuperado]
+        logger.info("[%s] Capital: $%.2f USDT (base: $%.2f, balance real: $%.2f)",
+                    BOT_TAG, capital_recuperado, rcfg.BOT_CAPITAL, balance_real)
     else:
         balance_ref = [balance_real]
         logger.info("[%s] Balance inicial: $%.2f USDT", BOT_TAG, balance_ref[0])
