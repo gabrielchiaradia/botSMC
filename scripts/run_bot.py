@@ -384,7 +384,6 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
 
     # Filtro ventana horaria: señal válida pero fuera de horario
     if senal.fuera_de_horario:
-        logger.warning(f"DEBUG: {senal.ticker} | Hora Señal (UTC): {senal.timestamp.hour:02d}:00 | Ventana: {senal.ventana} | Fuera de Horario: {senal.fuera_de_horario}")
         logger.info("⏰ Señal %s fuera de horario (%s). Registrando sin operar.",
                     senal.direccion, senal.ventana)
         journal.registrar_señal(senal, capital, "FUERA_DE_HORARIO")
