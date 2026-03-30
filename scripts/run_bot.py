@@ -411,6 +411,28 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
     if modo_live and client:
         orden_id = ejecutar_orden_entrada(client, senal, tamanio, excfg.SYMBOL)
         accion   = "ENTRADA"
+
+        if not orden_id:
+            # Timeout -1007: verificar si la orden igual se ejecutó en Binance
+            logger.warning("[%s] Timeout en orden — verificando posición real...", BOT_TAG)
+            time.sleep(3)
+            try:
+                pos_info = client.futures_position_information(symbol=excfg.SYMBOL)
+                hay_posicion = any(
+                    float(p["positionAmt"]) != 0
+                    for p in pos_info if p["symbol"] == excfg.SYMBOL
+                )
+            except Exception as e:
+                logger.warning("[%s] No se pudo verificar posición post-timeout: %s", BOT_TAG, e)
+                hay_posicion = False
+
+            if not hay_posicion:
+                logger.warning("[%s] Timeout confirmado sin posición — trade NO registrado.", BOT_TAG)
+                journal.registrar_señal(senal, capital, "ENTRADA_FALLIDA", tamanio,
+                                        res["riesgo_usd"], res["rr_ratio"], "")
+                return
+            else:
+                logger.info("[%s] Posición detectada post-timeout — registrando trade.", BOT_TAG)
     else:
         orden_id = ""
         accion   = "PAPER_ENTRADA"
