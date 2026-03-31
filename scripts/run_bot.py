@@ -177,29 +177,34 @@ def verificar_cierre_live(client, symbol, journal, balance):
                 ordenes_filled = []
 
             for t in journal.trades_abiertos():
-                # Buscar la orden que cerró este trade
-                motivo = "SL"  # Default conservador
+                motivo = "SL"
                 precio_cierre = t.stop_loss
 
-                for o in ordenes_filled:
-                    o_time = int(o.get("updateTime", 0))
-                    o_price = float(o.get("avgPrice", 0)) or float(o.get("stopPrice", 0))
-                    o_type = o.get("type", "")
-
-                    # La orden debe ser posterior a la apertura del trade
-                    from datetime import datetime
+                try:
                     trade_in_ms = int(datetime.fromisoformat(t.timestamp_in).timestamp() * 1000)
-                    if o_time <= trade_in_ms:
-                        continue
-
-                    if "TAKE_PROFIT" in o_type:
-                        motivo = "TP"
-                        precio_cierre = o_price if o_price > 0 else t.take_profit
-                        break
-                    elif "STOP" in o_type:
-                        motivo = "SL"
-                        precio_cierre = o_price if o_price > 0 else t.stop_loss
-                        break
+                    historial = client.futures_account_trades(
+                        symbol=symbol, startTime=trade_in_ms, limit=50
+                    )
+                    # Buscar trades de cierre (lado contrario a la entrada)
+                    close_side = "SELL" if t.direccion == "LONG" else "BUY"
+                    cierres = [
+                        h for h in historial
+                        if h.get("side") == close_side
+                        and float(h.get("realizedPnl", 0)) != 0
+                    ]
+                    if cierres:
+                        # Precio promedio ponderado de ejecución real
+                        total_qty = sum(float(h["qty"]) for h in cierres)
+                        precio_cierre = sum(float(h["price"]) * float(h["qty"]) for h in cierres) / total_qty
+                        pnl_real = sum(float(h.get("realizedPnl", 0)) for h in cierres)
+                        # Determinar motivo por PnL vs niveles configurados
+                        if t.direccion == "LONG":
+                            motivo = "TP" if precio_cierre >= t.take_profit * 0.999 else "SL"
+                        else:
+                            motivo = "TP" if precio_cierre <= t.take_profit * 1.001 else "SL"
+                        logger.info("Precio cierre real desde historial: $%.2f | Motivo: %s", precio_cierre, motivo)
+                except Exception as e:
+                    logger.warning("No se pudo leer historial de trades, usando precio SL/TP: %s", e)
 
                 # Calcular PnL real
                 if t.direccion == "LONG":
