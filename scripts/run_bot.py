@@ -220,6 +220,11 @@ def verificar_cierre_live(client, symbol, journal, balance):
                     cerrados.append(trade_cerrado)
                     exportar_dashboard(journal)
                     balance = nuevo_balance
+                    try:
+                        client.futures_cancel_all_open_orders(symbol=symbol)
+                        logger.info("[%s] Órdenes huérfanas canceladas post-cierre.", symbol)
+                    except Exception as e:
+                        logger.warning("[%s] No se pudieron cancelar órdenes huérfanas: %s", symbol, e)
 
     except Exception as e:
         logger.warning("No se pudo verificar posicion: %s", e)
