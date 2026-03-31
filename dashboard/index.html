@@ -1855,6 +1855,7 @@ async function renderOpenPositions() {
         ${p.symbol} · ${p._timeframe}<br>
         Entrada: <span>$${p.precio_entrada?.toLocaleString('en', {minimumFractionDigits: 2})}</span>
         → <span class="pos-price-now" id="pos-price-${i}">...</span><br>
+        Tamaño: <span style="color:var(--accent)">${Number(p.tamaño || p.tamaño_activo || 0).toFixed(4)}</span><br>
         SL: <span>$${p.stop_loss?.toLocaleString('en', {minimumFractionDigits: 2})}</span> · 
         TP: <span>$${p.take_profit?.toLocaleString('en', {minimumFractionDigits: 2})}</span><br>
         Score: <span>${p.score_señal}</span> · ${p._modo}<br>
