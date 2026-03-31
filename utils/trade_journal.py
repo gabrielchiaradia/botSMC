@@ -372,18 +372,26 @@ class TradeJournal:
     def recuperar_capital_hoy(self, capital_default: float) -> float:
         """
         Al reiniciar, recupera el capital acumulado leyendo el último
-        capital_out de los trades cerrados de hoy.
-        Si no hay trades cerrados hoy, retorna capital_default.
+        capital_out de los trades cerrados de hoy o ayer.
+        Si no hay trades cerrados, retorna capital_default.
         """
-        trades = self.leer_trades_hoy()
-        cerrados = [t for t in trades
-                    if t.get("resultado") not in ("ABIERTO", "CANCELADO", "")
-                    and t.get("capital_out", 0) > 0]
-        if cerrados:
-            capital_recuperado = cerrados[-1]["capital_out"]
-            logger.info("[%s] Capital recuperado del journal: $%.2f (último trade de hoy)",
-                        self.bot_tag, capital_recuperado)
-            return capital_recuperado
+        from datetime import timedelta
+        fechas = [
+            datetime.now().strftime("%Y%m%d"),
+            (datetime.now() - timedelta(days=1)).strftime("%Y%m%d"),
+        ]
+        for fecha in fechas:
+            path = self.log_dir / f"trades{self._bot_suffix}_{fecha}.json"
+            trades = self._leer_json(path)
+            cerrados = [t for t in trades
+                if t.get("resultado") not in ("ABIERTO", "CANCELADO", "")
+                and t.get("capital_out", 0) > 0]
+            if cerrados:
+                capital_recuperado = cerrados[-1]["capital_out"]
+                logger.info("[%s] Capital recuperado del journal (%s): $%.2f",
+                        self.bot_tag, fecha, capital_recuperado)
+                return capital_recuperado
+
         return capital_default
 
     def exportar_posiciones_abiertas(self) -> dict:
