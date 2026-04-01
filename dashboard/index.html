@@ -1560,7 +1560,7 @@ async function buscarArchivosLive() {
         if (item.name && item.name.startsWith('dashboard_trades') && item.name.endsWith('.json')) {
           // Formatos: dashboard_trades_YYYYMMDD.json (bot1)
           //           dashboard_trades_N_YYYYMMDD.json (bot N)
-          const match = item.name.match(/dashboard_trades_?(\d+)?_?(\d{8})\.json/);
+          const match = item.name.match(/dashboard_trades_?(\d+)?_?(\d{8})?\.json/);
           if (match) {
             const botNum = match[1] && match[1].length <= 2 ? match[1] : '1';
             const ymd = match[2] || match[1];  // fallback si no hay bot number
@@ -1625,7 +1625,7 @@ async function renderLiveFiles() {
   // Agrupar por bot number y quedarse con el más reciente de cada uno
   const porBot = {};
   for (const a of archs) {
-    const match = a.name.match(/dashboard_trades_?(\d+)?_?(\d{8})\.json/);
+    const match = a.name.match(/dashboard_trades_?(\d+)?_?(\d{8})?\.json/);
     const botNum = match && match[1] && match[1].length <= 2 ? match[1] : '1';
     if (!porBot[botNum]) porBot[botNum] = a; // ya vienen ordenados desc
   }
@@ -1686,7 +1686,7 @@ async function cargarDesdeServidor(filename, btn) {
     inicializar(data);
 
     // Si es archivo live, activar auto-refresh
-    if (filename.includes('dashboard_trades_')) {
+    if (filename.includes('dashboard_trades')) {
       _autoRefreshFile = filename;
       _autoRefreshBtn  = btn;
     } else {
