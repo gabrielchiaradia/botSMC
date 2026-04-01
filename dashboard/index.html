@@ -1563,8 +1563,10 @@ async function buscarArchivosLive() {
           const match = item.name.match(/dashboard_trades_?(\d+)?_?(\d{8})?\.json/);
           if (match) {
             const botNum = match[1] && match[1].length <= 2 ? match[1] : '1';
-            const ymd = match[2] || match[1];  // fallback si no hay bot number
-            const label = `Bot${botNum} · ${ymd.slice(0,4)}-${ymd.slice(4,6)}-${ymd.slice(6)}`;
+            const ymd = match[2] && match[2].length === 8 ? match[2] : null;
+            const label = ymd
+              ? `Bot${botNum} · ${ymd.slice(0,4)}-${ymd.slice(4,6)}-${ymd.slice(6)}`
+              : `Bot${botNum} · Histórico`;
             archivos.push({ name: 'api/logs/' + item.name, label });
           }
         }
