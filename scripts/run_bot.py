@@ -673,6 +673,9 @@ def main():
     # ── Reconciliar posiciones abiertas en Binance ────────
     if args.live and client:
         reconciliar_posiciones(client, journal, balance_ref[0])
+        # Exportar dashboard al arrancar con todos los trades históricos
+    exportar_dashboard(journal)
+    logger.info("[%s] Dashboard exportado al iniciar.", BOT_TAG)
 
     # ── Pre-cargar datos historicos ───────────────────────
     logger.info("Pre-cargando datos historicos...")
