@@ -474,7 +474,8 @@ def exportar_dashboard(journal):
     datos["bot_tag"] = journal.bot_tag
     lcfg.LOG_DIR.mkdir(parents=True, exist_ok=True)
     suffix = f"_{journal._bot_num}" if journal._bot_num > 1 else ""
-    path = lcfg.LOG_DIR / f"dashboard_trades{suffix}_{datetime.now().strftime('%Y%m%d')}.json"
+    path = lcfg.LOG_DIR / f"dashboard_trades{suffix}.json"
+
     try:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(datos, f, ensure_ascii=False, indent=2, default=str)

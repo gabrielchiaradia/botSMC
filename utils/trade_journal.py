@@ -427,7 +427,7 @@ class TradeJournal:
         }
 
     def exportar_como_backtest(self) -> dict:
-        trades_raw = self.leer_trades_hoy()
+        trades_raw = self.leer_todos_los_trades()
         if not trades_raw:
             return {}
 
@@ -607,3 +607,12 @@ class TradeJournal:
 
     def _contar_trades_hoy(self) -> int:
         return len(self._leer_json(self._trades_path))
+
+    def leer_todos_los_trades(self) -> list[dict]:
+        """Lee todos los trades de todos los archivos históricos."""
+        todos = []
+        if self.log_dir.exists():
+            pattern = f"trades{self._bot_suffix}_*.json"
+            for path in sorted(self.log_dir.glob(pattern)):
+                todos.extend(self._leer_json(path))
+        return todos
