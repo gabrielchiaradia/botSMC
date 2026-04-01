@@ -609,7 +609,6 @@ class TradeJournal:
         return len(self._leer_json(self._trades_path))
 
     def leer_todos_los_trades(self) -> list[dict]:
-        """Lee todos los trades de todos los archivos históricos."""
         todos = []
         if self.log_dir.exists():
             pattern = f"trades{self._bot_suffix}_*.json"
