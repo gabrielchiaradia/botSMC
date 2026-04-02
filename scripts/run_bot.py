@@ -85,8 +85,10 @@ def ejecutar_orden_entrada(client, senal, tamanio, symbol) -> str:
 
     # 1. Orden de entrada (MARKET)
     try:
+        position_side = "LONG" if lado == "BUY" else "SHORT"
         orden = client.futures_create_order(
-            symbol=symbol, side=lado, type="MARKET", quantity=tamanio
+            symbol=symbol, side=lado, positionSide=position_side,
+            type="MARKET", quantity=tamanio
         )
         oid = str(orden["orderId"])
         logger.info("Orden ejecutada: ID %s | %s %.3f %s", oid, lado, tamanio, symbol)
@@ -105,6 +107,7 @@ def ejecutar_orden_entrada(client, senal, tamanio, symbol) -> str:
         params = {
             "symbol":        symbol,
             "side":          lado_sl,
+            "positionSide":  "LONG" if lado == "BUY" else "SHORT",
             "quantity":      str(tamanio),
             "triggerprice":  str(stop_price),
             "price":         str(stop_price),
