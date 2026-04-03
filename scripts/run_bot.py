@@ -114,7 +114,6 @@ def ejecutar_orden_entrada(client, senal, tamanio, symbol) -> str:
             "type":          tipo,
             "algoType":      "CONDITIONAL",
             "workingType":   "MARK_PRICE",
-            "reduceOnly":    "true",
             "timestamp":     str(int(time.time() * 1000)),
         }
         query = urllib.parse.urlencode(params)
