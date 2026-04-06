@@ -109,8 +109,10 @@ def ejecutar_orden_entrada(client, senal, tamanio, symbol) -> str:
     tp_price = round(senal.take_profit, 2)
 
     try:
+        position_side = "LONG" if lado == "BUY" else "SHORT"
         orden = client.futures_create_order(
-            symbol=symbol, side=lado, type="MARKET", quantity=tamanio
+            symbol=symbol, side=lado, positionSide=position_side,
+            type="MARKET", quantity=tamanio
         )
         oid = str(orden["orderId"])
         logger.info("Orden ejecutada: ID %s | %s %.3f %s", oid, lado, tamanio, symbol)
@@ -128,13 +130,13 @@ def ejecutar_orden_entrada(client, senal, tamanio, symbol) -> str:
         params = {
             "symbol":        symbol,
             "side":          lado_sl,
+            "positionSide":  "LONG" if lado == "BUY" else "SHORT",
             "quantity":      str(tamanio),
             "triggerprice":  str(stop_price),
             "price":         str(stop_price),
             "type":          tipo,
             "algoType":      "CONDITIONAL",
             "workingType":   "MARK_PRICE",
-            "reduceOnly":    "true",
             "timestamp":     str(int(time.time() * 1000)),
         }
         query = urllib.parse.urlencode(params)
