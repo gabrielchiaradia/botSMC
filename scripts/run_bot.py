@@ -7,6 +7,7 @@ Bot completo con:
   - Notificaciones Telegram
   - Journal completo de señales y trades
   - Multi-bot: --bot-number N carga .envN
+  - Integración con regime-bot: solo opera en Régimen 1 (Tendencia)
 
 Uso:
     python scripts/run_bot.py               # Paper trading (Bot 1, .env)
@@ -22,10 +23,9 @@ import json
 import websocket # type: ignore
 import pandas as pd
 from pathlib import Path
+from datetime import datetime, timezone
 
 # ── Pre-parsear --bot-number ANTES de importar config ────────────────────
-# Esto permite que config/settings.py lea la variable BOT_NUMBER
-# y cargue el .env correcto.
 _pre_parser = argparse.ArgumentParser(add_help=False)
 _pre_parser.add_argument("--bot-number", type=int, default=None)
 _pre_args, _ = _pre_parser.parse_known_args()
@@ -33,7 +33,6 @@ if _pre_args.bot_number is not None:
     os.environ["BOT_NUMBER"] = str(_pre_args.bot_number)
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from datetime import datetime
 
 from config import creds, exchange as excfg, mtf as mcfg, ws as wscfg, BOT_TAG, BOT_NUMBER
 from config.settings import logs as lcfg, strategy as scfg
@@ -54,19 +53,45 @@ logger = get_logger("run_bot")
 
 TF_SEGUNDOS = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 14400}
 
+# ── Configuración del clasificador de regímenes ───────────────────────────
+# El SMC opera SOLO en Régimen 1 (Tendencia).
+# Si el archivo no existe, opera normalmente (fallback conservador).
+REGIME_STATE_PATH  = Path(os.getenv("REGIME_STATE_PATH", "/shared/regime_state.json"))
+REGIME_MAX_AGE_MIN = int(os.getenv("REGIME_MAX_AGE_MIN", "30"))  # minutos antes de ignorar
 
-# ══════════════════════════════════════════════════════════
-#  ARGS
-# ══════════════════════════════════════════════════════════
-def parse_args():
-    p = argparse.ArgumentParser(description="SMC Bot Fase 3")
-    p.add_argument("--live", action="store_true",
-                   help="Ejecutar ordenes reales en Testnet")
-    p.add_argument("--poll", action="store_true",
-                   help="Usar polling REST en lugar de WebSocket")
-    p.add_argument("--bot-number", type=int, default=1,
-                   help="Número de bot (1=.env, 2=.env2, etc.)")
-    return p.parse_args()
+
+def leer_regime_smc(symbol: str) -> int:
+    """
+    Lee el régimen actual del JSON escrito por el regime-bot.
+    Retorna:
+        0 = Lateral       → NO operar (SMC no tiene edge en lateral)
+        1 = Tendencia      → OPERAR (condición ideal para SMC)
+        2 = Alta Vol       → NO operar
+       -1 = sin archivo    → operar normalmente (fallback)
+    """
+    try:
+        if not REGIME_STATE_PATH.exists():
+            return -1
+        state = json.loads(REGIME_STATE_PATH.read_text())
+        regime = state.get(symbol, -1)
+
+        # Verificar antigüedad del archivo
+        updated_at = state.get("updated_at", "")
+        if updated_at:
+            last_update = datetime.fromisoformat(updated_at)
+            # Asegurar que last_update sea timezone-aware
+            if last_update.tzinfo is None:
+                last_update = last_update.replace(tzinfo=timezone.utc)
+            age_min = (datetime.now(timezone.utc) - last_update).total_seconds() / 60
+            if age_min > REGIME_MAX_AGE_MIN:
+                logger.warning("[%s] regime_state.json tiene %.0f min — fallback a operar normal",
+                               symbol, age_min)
+                return -1
+
+        return int(regime)
+    except Exception as e:
+        logger.warning("[%s] No se pudo leer regime_state.json: %s — fallback", symbol, e)
+        return -1
 
 
 # ══════════════════════════════════════════════════════════
@@ -83,7 +108,6 @@ def ejecutar_orden_entrada(client, senal, tamanio, symbol) -> str:
     sl_price = round(senal.stop_loss, 2)
     tp_price = round(senal.take_profit, 2)
 
-    # 1. Orden de entrada (MARKET)
     try:
         orden = client.futures_create_order(
             symbol=symbol, side=lado, type="MARKET", quantity=tamanio
@@ -94,7 +118,6 @@ def ejecutar_orden_entrada(client, senal, tamanio, symbol) -> str:
         logger.error("Error orden entrada: %s", e)
         return ""
 
-    # 2. SL y TP via Algo Order API
     base_url = (
         "https://testnet.binancefuture.com"
         if excfg.TESTNET
@@ -143,8 +166,7 @@ def ejecutar_orden_entrada(client, senal, tamanio, symbol) -> str:
     return oid
 
 def verificar_cierre_live(client, symbol, journal, balance):
-    """Verifica si alguno de los trades abiertos se cerró en Binance.
-    Lee el historial de órdenes para determinar si fue TP o SL."""
+    """Verifica si alguno de los trades abiertos se cerró en Binance."""
     cerrados = []
     if not journal.hay_trade_abierto() or not client:
         return cerrados
@@ -156,14 +178,9 @@ def verificar_cierre_live(client, symbol, journal, balance):
                 pos_amt = float(p["positionAmt"])
                 break
 
-        # Si no hay posición en Binance pero hay trades abiertos en el journal
         if pos_amt == 0 and journal.hay_trade_abierto():
-            # Leer órdenes recientes para saber qué se ejecutó
             try:
-                ordenes = client.futures_get_all_orders(
-                    symbol=symbol, limit=20
-                )
-                # Buscar órdenes condicionales ejecutadas (SL o TP)
+                ordenes = client.futures_get_all_orders(symbol=symbol, limit=20)
                 ordenes_filled = [
                     o for o in ordenes
                     if o["status"] == "FILLED"
@@ -185,7 +202,6 @@ def verificar_cierre_live(client, symbol, journal, balance):
                     historial = client.futures_account_trades(
                         symbol=symbol, startTime=trade_in_ms, limit=50
                     )
-                    # Buscar trades de cierre (lado contrario a la entrada)
                     close_side = "SELL" if t.direccion == "LONG" else "BUY"
                     cierres = [
                         h for h in historial
@@ -193,38 +209,32 @@ def verificar_cierre_live(client, symbol, journal, balance):
                         and float(h.get("realizedPnl", 0)) != 0
                     ]
                     if cierres:
-                        # Precio promedio ponderado de ejecución real
                         total_qty = sum(float(h["qty"]) for h in cierres)
                         precio_cierre = sum(float(h["price"]) * float(h["qty"]) for h in cierres) / total_qty
                         pnl_real = sum(float(h.get("realizedPnl", 0)) for h in cierres)
-                        # Determinar motivo por PnL vs niveles configurados
                         if t.direccion == "LONG":
                             motivo = "TP" if precio_cierre >= t.take_profit * 0.999 else "SL"
                         else:
                             motivo = "TP" if precio_cierre <= t.take_profit * 1.001 else "SL"
-                        logger.info("Precio cierre real desde historial: $%.2f | Motivo: %s", precio_cierre, motivo)
+                        logger.info("Precio cierre real: $%.2f | Motivo: %s", precio_cierre, motivo)
                 except Exception as e:
-                    logger.warning("No se pudo leer historial de trades, usando precio SL/TP: %s", e)
+                    logger.warning("No se pudo leer historial: %s", e)
 
-                # Calcular PnL real
                 if t.direccion == "LONG":
                     pnl = (precio_cierre - t.precio_entrada) * t.tamaño
                 else:
                     pnl = (t.precio_entrada - precio_cierre) * t.tamaño
 
                 nuevo_balance = round(balance + pnl, 2)
-                trade_cerrado = journal.cerrar_trade(
-                    precio_cierre, nuevo_balance, motivo, trade=t
-                )
+                trade_cerrado = journal.cerrar_trade(precio_cierre, nuevo_balance, motivo, trade=t)
                 if trade_cerrado:
                     cerrados.append(trade_cerrado)
                     exportar_dashboard(journal)
                     balance = nuevo_balance
                     try:
                         client.futures_cancel_all_open_orders(symbol=symbol)
-                        logger.info("[%s] Órdenes huérfanas canceladas post-cierre.", symbol)
                     except Exception as e:
-                        logger.warning("[%s] No se pudieron cancelar órdenes huérfanas: %s", symbol, e)
+                        logger.warning("No se pudieron cancelar órdenes huérfanas: %s", e)
 
     except Exception as e:
         logger.warning("No se pudo verificar posicion: %s", e)
@@ -232,7 +242,6 @@ def verificar_cierre_live(client, symbol, journal, balance):
 
 
 def simular_cierre_paper(df, journal, balance):
-    """Simula cierre de todos los trades abiertos en paper trading."""
     cerrados = []
     if not journal.hay_trade_abierto():
         return cerrados
@@ -254,6 +263,7 @@ def simular_cierre_paper(df, journal, balance):
                 break
     return cerrados
 
+
 # ══════════════════════════════════════════════════════════
 #  TRACKING DE HORARIO OPERATIVO
 # ══════════════════════════════════════════════════════════
@@ -263,44 +273,37 @@ _en_horario_operativo = False
 def chequear_horario_operativo(notifier, balance):
     global _en_horario_operativo
     from strategy.indicators import en_ventana_horaria
-    from datetime import datetime, timezone
 
-    # 1. Forzamos la obtención de la hora actual en UTC
     ahora_utc = datetime.now(timezone.utc)
-    
-    # 2. Convertimos a Timestamp de Pandas sin zona horaria para la comparación
-    # Esto asegura que si son las 16:45 UTC, el bot compare contra el 16 de tu config
-    ahora_pd = pd.Timestamp(ahora_utc.replace(tzinfo=None))
+    ahora_pd  = pd.Timestamp(ahora_utc.replace(tzinfo=None))
+    dentro    = en_ventana_horaria(ahora_pd)
 
-    # 3. Validamos si estamos dentro del rango (ej. 13-16)
-    dentro = en_ventana_horaria(ahora_pd)
-
-    # Log de diagnóstico para auditoría en tiempo real
-    logger.info(f"🕒 Validando Horario: UTC={ahora_pd.strftime('%H:%M')} | ¿Dentro de ventana?: {dentro}")
+    logger.info(f"Validando Horario: UTC={ahora_pd.strftime('%H:%M')} | Dentro de ventana?: {dentro}")
 
     if dentro and not _en_horario_operativo:
         _en_horario_operativo = True
         from config import strategy as scfg
         windows = scfg.TRADING_WINDOWS_RAW
         notifier._enviar(
-            f"🟢 *INICIO HORARIO OPERATIVO*\n"
+            f"INICIO HORARIO OPERATIVO\n"
             f"Ventana: `{windows}` UTC\n"
             f"Balance: `${balance:,.2f}` USDT\n"
-            f"🕐 `{ahora_pd.strftime('%H:%M')} UTC / {ahora_utc.astimezone().strftime('%H:%M')} Local`"
+            f"`{ahora_pd.strftime('%H:%M')} UTC`"
         )
-        logger.info("🟢 Inicio horario operativo: %s UTC", windows)
+        logger.info("Inicio horario operativo: %s UTC", windows)
 
     elif not dentro and _en_horario_operativo:
         _en_horario_operativo = False
         from config import strategy as scfg
         windows = scfg.TRADING_WINDOWS_RAW
         notifier._enviar(
-            f"🔴 *FIN HORARIO OPERATIVO*\n"
+            f"FIN HORARIO OPERATIVO\n"
             f"Ventana: `{windows}` UTC cerrada\n"
             f"Balance: `${balance:,.2f}` USDT\n"
-            f"🕐 `{ahora_pd.strftime('%H:%M')} UTC / {ahora_utc.astimezone().strftime('%H:%M')} Local`"
+            f"`{ahora_pd.strftime('%H:%M')} UTC`"
         )
-        logger.info("🔴 Fin horario operativo: %s UTC", windows)
+        logger.info("Fin horario operativo: %s UTC", windows)
+
 
 # ══════════════════════════════════════════════════════════
 #  LOGICA CENTRAL DE ANALISIS
@@ -311,12 +314,9 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
     Llamado por WebSocket (al cierre de vela) o por el loop de polling.
     Soporta múltiples trades simultáneos.
     """
-    # balance_real: solo para verificar cierres en Binance
-    # capital: capital asignado al bot (BOT_CAPITAL), usado para riesgo y journal
     balance_real = obtener_balance_usdt(client) if client else balance_ref[0]
     capital = balance_ref[0]
 
-    # Chequear inicio/fin de horario operativo
     chequear_horario_operativo(notifier, capital)
 
     # Verificar cierre de posiciones abiertas
@@ -329,21 +329,37 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
     for tc in trades_cerrados:
         notifier.trade_cerrado(tc, tc.motivo_cierre)
         exportar_dashboard(journal)
-        # Actualizar capital con PnL real
         balance_ref[0] = round(balance_ref[0] + tc.pnl_usd, 2)
         logger.info("Capital actualizado: $%.2f (PnL: $%+.2f)", balance_ref[0], tc.pnl_usd)
 
-    # Mostrar estado de posiciones abiertas
     if journal.hay_trade_abierto():
         for t in journal.trades_abiertos():
             logger.info("Posicion abierta: %s @ $%.2f | SL $%.2f | TP $%.2f",
                         t.direccion, t.precio_entrada, t.stop_loss, t.take_profit)
 
-    # Si no hay espacio para más trades, salir
     if not journal.puede_abrir_trade():
         logger.info("Max trades alcanzado (%d/%d). Esperando cierre.",
                     journal.num_trades_abiertos(), journal.max_open)
         return
+
+    # ── Filtro de régimen ──────────────────────────────────────────────────
+    # El SMC opera SOLO en Régimen 1 (Tendencia).
+    # En lateral (0) el SMC genera falsas señales. En alta vol (2) el riesgo es alto.
+    regime = leer_regime_smc(excfg.SYMBOL)
+    if regime == 0:
+        logger.info("[%s] Regimen LATERAL (0) — SMC no opera en lateral. Esperando tendencia.",
+                    excfg.SYMBOL)
+        return
+    elif regime == 2:
+        logger.info("[%s] Regimen ALTA VOLATILIDAD (2) — SMC pausado por volatilidad extrema.",
+                    excfg.SYMBOL)
+        return
+    elif regime == 1:
+        logger.info("[%s] Regimen TENDENCIA (1) — SMC activo.", excfg.SYMBOL)
+    else:
+        # regime == -1: sin archivo, operar normalmente
+        logger.debug("[%s] Sin regime_state.json — SMC operando sin filtro de regimen.", excfg.SYMBOL)
+    # ── Fin filtro de régimen ──────────────────────────────────────────────
 
     # Analizar mercado (MTF si disponible, fallback a STF)
     if df_htf is not None and not df_htf.empty and mcfg.ENABLED:
@@ -389,18 +405,15 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
             logger.info("Señal filtrada por perfil '%s': %s", perfil.nombre, motivo)
             journal.registrar_señal(senal, capital, f"FILTRO_{perfil.nombre.upper()}")
             return
-        # Agregar motivos del perfil a la señal
         senal.motivos.extend(m for m in motivos_filtro if m and m not in senal.motivos)
 
-    # Filtro ventana horaria: señal válida pero fuera de horario
     if senal.fuera_de_horario:
-        logger.info("⏰ Señal %s fuera de horario (%s). Registrando sin operar.",
+        logger.info("Señal %s fuera de horario (%s). Registrando sin operar.",
                     senal.direccion, senal.ventana)
         journal.registrar_señal(senal, capital, "FUERA_DE_HORARIO")
         notifier.señal_fuera_de_horario(senal, capital)
         return
 
-    # Calcular tamanio sobre capital asignado
     res = resumen_riesgo(capital, senal.precio_entrada, senal.stop_loss,
                          senal.take_profit, excfg.SYMBOL)
     tamanio = res["tamaño"]
@@ -417,13 +430,11 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
         journal.registrar_señal(senal, capital, "TAMANIO_INVALIDO", tamanio)
         return
 
-    # Ejecutar
     if modo_live and client:
         orden_id = ejecutar_orden_entrada(client, senal, tamanio, excfg.SYMBOL)
         accion   = "ENTRADA"
 
         if not orden_id:
-            # Timeout -1007: verificar si la orden igual se ejecutó en Binance
             logger.warning("[%s] Timeout en orden — verificando posición real...", BOT_TAG)
             time.sleep(3)
             try:
@@ -470,24 +481,19 @@ def exportar_dashboard(journal):
     datos = journal.exportar_como_backtest()
     if not datos:
         return
-    # Agregar bot_tag al export para que el dashboard lo muestre
     datos["bot_tag"] = journal.bot_tag
     lcfg.LOG_DIR.mkdir(parents=True, exist_ok=True)
     suffix = f"_{journal._bot_num}" if journal._bot_num > 1 else ""
     path = lcfg.LOG_DIR / f"dashboard_trades{suffix}.json"
-
     try:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(datos, f, ensure_ascii=False, indent=2, default=str)
     except OSError as e:
         logger.warning("No se pudo exportar dashboard: %s", e)
-
-    # Exportar posiciones abiertas
     exportar_posiciones_abiertas(journal)
 
 
 def exportar_posiciones_abiertas(journal):
-    """Escribe las posiciones abiertas actuales a un JSON para el dashboard."""
     lcfg.LOG_DIR.mkdir(parents=True, exist_ok=True)
     suffix = f"_{journal._bot_num}" if journal._bot_num > 1 else ""
     path = lcfg.LOG_DIR / f"open_positions{suffix}.json"
@@ -506,14 +512,12 @@ def mostrar_resumen(journal, modo, notifier):
     r     = journal.resumen_hoy()
     color = "\033[32m" if r["pnl_usd"] >= 0 else "\033[31m"
     reset = "\033[0m"
-    fecha = datetime.now().strftime("%Y%m%d")
     print(f"\n{'='*52}")
     print(f"{'  RESUMEN DEL DIA':^52}")
     print(f"{'='*52}")
     print(f"  Trades:   {r['trades']}   Wins: {r['wins']}   Losses: {r['losses']}")
     print(f"  Win Rate: {r['win_rate']}%")
     print(f"  PnL:      {color}${r['pnl_usd']:+.2f} USDT{reset}")
-    print(f"\n  logs/dashboard_trades_{fecha}.json <- dashboard")
     print(f"{'='*52}\n")
     notifier.resumen_diario(r, modo)
     notifier.bot_detenido("Ctrl+C")
@@ -523,13 +527,6 @@ def mostrar_resumen(journal, modo, notifier):
 #  RECONCILIACION DE POSICIONES
 # ══════════════════════════════════════════════════════════
 def reconciliar_posiciones(client, journal, balance):
-    """
-    Sincroniza el journal contra Binance al iniciar.
-    - Limpia trades fantasma (están en journal pero no en Binance)
-    - Restaura posiciones propias huérfanas usando open_positions{suffix}.json
-      como fuente de verdad — ese archivo solo lo escribe este bot,
-      por lo que no hay riesgo de registrar trades de otros bots o manuales
-    """
     try:
         posiciones = client.futures_position_information(symbol=excfg.SYMBOL)
         pos_reales = {
@@ -538,13 +535,10 @@ def reconciliar_posiciones(client, journal, balance):
             if float(p["positionAmt"]) != 0
         }
 
-        # 1. Limpiar fantasmas del journal
         for t in list(journal.trades_abiertos()):
             if t.direccion not in pos_reales:
-                logger.warning(
-                    "[%s] ⚠️  Trade fantasma eliminado: %s @ $%.2f",
-                    BOT_TAG, t.direccion, t.precio_entrada
-                )
+                logger.warning("[%s] Trade fantasma eliminado: %s @ $%.2f",
+                               BOT_TAG, t.direccion, t.precio_entrada)
                 journal.cerrar_trade(
                     precio_salida = t.precio_entrada,
                     capital_out   = balance,
@@ -552,8 +546,6 @@ def reconciliar_posiciones(client, journal, balance):
                     trade         = t,
                 )
 
-        # 2. Restaurar huérfanas desde open_positions{suffix}.json
-        # Este archivo solo lo escribe este bot → fuente de verdad segura
         from config.settings import logs as lcfg
         import json as _json
         suffix  = f"_{BOT_NUMBER}" if BOT_NUMBER > 1 else ""
@@ -563,33 +555,24 @@ def reconciliar_posiciones(client, journal, balance):
             op_data = _json.loads(op_path.read_text())
             for pos in op_data.get("posiciones", []):
                 direccion = pos["direccion"]
-
-                # ¿Ya está en el journal?
                 ya_en_journal = any(
-                    t.direccion == direccion
-                    for t in journal.trades_abiertos()
+                    t.direccion == direccion for t in journal.trades_abiertos()
                 )
                 if ya_en_journal:
                     continue
-
-                # ¿Sigue abierta en Binance?
                 if direccion not in pos_reales:
-                    logger.warning(
-                        "[%s] Posición propia (%s @ $%.2f) ya no existe en Binance — ignorando.",
-                        BOT_TAG, direccion, pos["precio_entrada"]
-                    )
+                    logger.warning("[%s] Posición propia (%s @ $%.2f) ya no existe — ignorando.",
+                                   BOT_TAG, direccion, pos["precio_entrada"])
                     continue
-
-                logger.warning(
-                    "[%s] ⚠️  Posición propia huérfana restaurada: %s @ $%.2f",
-                    BOT_TAG, direccion, pos["precio_entrada"]
-                )
+                logger.warning("[%s] Posición propia huérfana restaurada: %s @ $%.2f",
+                               BOT_TAG, direccion, pos["precio_entrada"])
                 journal.registrar_posicion_externa(pos_reales[direccion], balance)
 
         exportar_posiciones_abiertas(journal)
 
     except Exception as e:
-        logger.error("Error reconciliando posiciones con Binance: %s", e)
+        logger.error("Error reconciliando posiciones: %s", e)
+
 
 # ══════════════════════════════════════════════════════════
 #  MAIN
@@ -618,11 +601,11 @@ def main():
     print(f"  RR:         1:{rcfg.TP_RR_RATIO}")
     print(f"  Riesgo:     {rcfg.RISK_PER_TRADE*100:.1f}% por trade")
     print(f"  Estrategia: {scfg.STRATEGY}")
+    print(f"  Regime:     {REGIME_STATE_PATH}")
     if rcfg.BOT_CAPITAL > 0:
         print(f"  Capital:    ${rcfg.BOT_CAPITAL:,.0f} USDT (asignado)")
     print(f"{'='*60}\n")
 
-    # ── Cargar perfil de estrategia ───────────────────────
     perfil = None
     if scfg.STRATEGY != "base":
         try:
@@ -634,7 +617,6 @@ def main():
             logger.warning("No se pudo cargar perfil '%s': %s. Usando base.",
                            scfg.STRATEGY, e)
 
-    # ── Conectar exchange ─────────────────────────────────
     client = None
     if args.live:
         creds.validate()
@@ -644,16 +626,12 @@ def main():
             testnet=excfg.TESTNET,
         )
 
-    # ── Servicios ─────────────────────────────────────────
     journal  = TradeJournal(symbol=excfg.SYMBOL, timeframe=mcfg.LTF, modo=modo,
                             max_open=rcfg.MAX_OPEN_TRADES, bot_tag=BOT_TAG)
     notifier = crear_notifier(bot_tag=BOT_TAG)
 
-    # Capital: usar BOT_CAPITAL del .env si está seteado, sino balance real
     balance_real = obtener_balance_usdt(client) if client else 1000.0
     if rcfg.BOT_CAPITAL > 0:
-        # Recuperar capital acumulado del journal si hay trades cerrados hoy.
-        # Asi al reiniciar el container no se pierde el PnL del dia.
         capital_recuperado = journal.recuperar_capital_hoy(rcfg.BOT_CAPITAL)
         balance_ref = [capital_recuperado]
         logger.info("[%s] Capital: $%.2f USDT (base: $%.2f, balance real: $%.2f)",
@@ -669,29 +647,21 @@ def main():
                        max_trades=rcfg.MAX_OPEN_TRADES,
                        windows=scfg.TRADING_WINDOWS_RAW)
 
-
-    # ── Reconciliar posiciones abiertas en Binance ────────
     if args.live and client:
         reconciliar_posiciones(client, journal, balance_ref[0])
-        # Exportar dashboard al arrancar con todos los trades históricos
     exportar_dashboard(journal)
     logger.info("[%s] Dashboard exportado al iniciar.", BOT_TAG)
 
-    # ── Pre-cargar datos historicos ───────────────────────
     logger.info("Pre-cargando datos historicos...")
     df_ltf_hist = obtener_historico_backtest(excfg.SYMBOL, mcfg.LTF, dias=3)
     df_htf_hist = obtener_historico_backtest(excfg.SYMBOL, mcfg.HTF, dias=10)
 
     try:
-        # ══════════════════════════════════════════════════
-        #  MODO WEBSOCKET
-        # ══════════════════════════════════════════════════
         if usar_ws:
             try:
                 from bot.websocket_stream import MTFStream
             except ImportError:
-                logger.error("websocket-client no instalado. Usar: pip install websocket-client")
-                logger.info("Cambiando a modo polling...")
+                logger.error("websocket-client no instalado.")
                 usar_ws = False
 
         if usar_ws:
@@ -711,9 +681,6 @@ def main():
             while True:
                 time.sleep(1)
 
-        # ══════════════════════════════════════════════════
-        #  MODO POLLING
-        # ══════════════════════════════════════════════════
         else:
             espera  = TF_SEGUNDOS.get(mcfg.LTF, 300)
             ciclo_n = 0
@@ -739,6 +706,14 @@ def main():
         if usar_ws:
             stream.detener()
         mostrar_resumen(journal, modo, notifier)
+
+
+def parse_args():
+    p = argparse.ArgumentParser(description="SMC Bot Fase 3")
+    p.add_argument("--live", action="store_true")
+    p.add_argument("--poll", action="store_true")
+    p.add_argument("--bot-number", type=int, default=1)
+    return p.parse_args()
 
 
 if __name__ == "__main__":
