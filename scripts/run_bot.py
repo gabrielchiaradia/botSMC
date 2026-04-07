@@ -346,19 +346,10 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
     # El SMC opera SOLO en Régimen 1 (Tendencia).
     # En lateral (0) el SMC genera falsas señales. En alta vol (2) el riesgo es alto.
     regime = leer_regime_smc(excfg.SYMBOL)
-    if regime == 0:
-        logger.info("[%s] Regimen LATERAL (0) — SMC no opera en lateral. Esperando tendencia.",
-                    excfg.SYMBOL)
+    if regime == 2:
+        logger.info("[%s] Regimen ALTA VOLATILIDAD (2) — SMC pausado.", excfg.SYMBOL)
         return
-    elif regime == 2:
-        logger.info("[%s] Regimen ALTA VOLATILIDAD (2) — SMC pausado por volatilidad extrema.",
-                    excfg.SYMBOL)
-        return
-    elif regime == 1:
-        logger.info("[%s] Regimen TENDENCIA (1) — SMC activo.", excfg.SYMBOL)
-    else:
-        # regime == -1: sin archivo, operar normalmente
-        logger.debug("[%s] Sin regime_state.json — SMC operando sin filtro de regimen.", excfg.SYMBOL)
+    logger.info("[%s] Regimen %d — SMC activo.", excfg.SYMBOL, regime)
     # ── Fin filtro de régimen ──────────────────────────────────────────────
 
     # Analizar mercado (MTF si disponible, fallback a STF)
