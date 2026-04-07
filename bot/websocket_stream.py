@@ -305,7 +305,8 @@ class MTFStream:
 
         # Buffer HTF independiente (solo acumula, no dispara callback)
         self.buffer_htf = CandleBuffer(maxlen=buffer_htf)
-
+        self._df_htf_cache = None
+        
         # Stream LTF (dispara el análisis)
         self._stream_ltf = BinanceKlineStream(
             symbol          = symbol,
@@ -340,19 +341,20 @@ class MTFStream:
 
     def _on_htf_close(self, df: pd.DataFrame, buffer: CandleBuffer):
         """Actualiza el buffer HTF cuando cierra una vela."""
-        self.buffer_htf = buffer 
+        with threading.Lock():
+            self._df_htf_cache = df  # cachear el df directamente
         logger.debug("Vela HTF cerrada | %s | Close: $%.2f",
-                     self.htf, df["close"].iloc[-1])
+                    self.htf, df["close"].iloc[-1])
+
 
     def _on_ltf_close(self, df_ltf: pd.DataFrame, buffer: CandleBuffer):
         """
         Callback principal: cierra una vela LTF.
         Obtiene el contexto HTF del buffer y llama on_señal.
         """
-        df_htf = self.buffer_htf.get_dataframe()
-
-        if df_htf.empty or len(df_htf) < 20:
+        df_htf = getattr(self, '_df_htf_cache', None)
+        if df_htf is None or df_htf.empty or len(df_htf) < 20:
             logger.debug("Buffer HTF insuficiente, usando solo LTF.")
             df_htf = None
-
         self.on_señal(df_ltf, df_htf)
+
