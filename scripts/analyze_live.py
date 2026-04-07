@@ -89,15 +89,18 @@ def get_orders(symbol: str, days: int) -> list:
         print(f"  {K.Y}⚠ Error obteniendo órdenes: {e}{K.X}")
         return []
 
-def get_income(symbol: str, days: int) -> list:
+def get_income(symbol: str, days: int) -> tuple[list, list]:
+    """Retorna (realized_pnl, funding_fees) por separado."""
     since_ms = int((datetime.now(timezone.utc) - timedelta(days=days)).timestamp() * 1000)
-    try:
-        raw = _get("/fapi/v1/income", {"symbol": symbol, "incomeType": "REALIZED_PNL",
-                                        "limit": 1000, "startTime": since_ms})
-        return raw if isinstance(raw, list) else []
-    except Exception as e:
-        print(f"  {K.Y}⚠ Error obteniendo income: {e}{K.X}")
-        return []
+    realized, funding = [], []
+    for income_type, target in [("REALIZED_PNL", realized), ("FUNDING_FEE", funding)]:
+        try:
+            raw = _get("/fapi/v1/income", {"symbol": symbol, "incomeType": income_type,
+                                            "limit": 1000, "startTime": since_ms})
+            target.extend(raw if isinstance(raw, list) else [])
+        except Exception as e:
+            print(f"  {K.Y}⚠ Error obteniendo {income_type}: {e}{K.X}")
+    return realized, funding
 
 # ── Análisis ──────────────────────────────────────────────────────────────────
 def analyze_live(symbol: str, days: int):
@@ -120,7 +123,7 @@ def analyze_live(symbol: str, days: int):
     print(f"  {K.D}{'─'*55}{K.X}")
 
     trades = get_closed_trades(symbol, days)
-    income = get_income(symbol, days)
+    income, funding = get_income(symbol, days)
 
     if not trades:
         print(f"  {K.D}  Sin trades ejecutados.{K.X}")
@@ -175,13 +178,20 @@ def analyze_live(symbol: str, days: int):
             print(f"  {day:<12} {len(pnls):>6}  {pc}{dpnl:>+12.2f}{K.X}")
         print(f"  {K.D}{'─'*35}{K.X}")
 
-        pnl_c = K.G if total_pnl > 0 else K.R
-        pf_c  = K.G if pf >= 1.3 else (K.Y if pf >= 1.0 else K.R)
-        wr_c  = K.G if wr >= 55 else (K.Y if wr >= 45 else K.R)
-        pf_s  = f"{pf:.2f}" if pf != float("inf") else "∞"
+        total_funding = sum(float(f["income"]) for f in funding)
+        net_pnl = total_pnl + total_funding
 
-        print(f"\n  💹 {K.B}PnL Total:{K.X}     {pnl_c}{total_pnl:>+10.2f} USDT{K.X}")
-        print(f"  📈 {K.B}Win Rate:{K.X}      {wr_c}{wr}%{K.X}  ({wins}W / {losses}L)")
+        pnl_c  = K.G if total_pnl > 0 else K.R
+        net_c  = K.G if net_pnl > 0 else K.R
+        pf_c   = K.G if pf >= 1.3 else (K.Y if pf >= 1.0 else K.R)
+        wr_c   = K.G if wr >= 55 else (K.Y if wr >= 45 else K.R)
+        fund_c = K.G if total_funding >= 0 else K.R
+        pf_s   = f"{pf:.2f}" if pf != float("inf") else "∞"
+
+        print(f"\n  💹 {K.B}PnL Trades:{K.X}    {pnl_c}{total_pnl:>+10.2f} USDT{K.X}  {K.D}({wins}W / {losses}L){K.X}")
+        print(f"  💸 {K.B}Funding Fees:{K.X}  {fund_c}{total_funding:>+10.2f} USDT{K.X}  {K.D}({len(funding)} cobros){K.X}")
+        print(f"  💰 {K.B}PnL Neto:{K.X}      {net_c}{net_pnl:>+10.2f} USDT{K.X}")
+        print(f"  📈 {K.B}Win Rate:{K.X}      {wr_c}{wr}%{K.X}")
         print(f"  ⚖️  {K.B}Profit Factor:{K.X} {pf_c}{pf_s}{K.X}")
 
     # ── Órdenes rechazadas ────────────────────────────────────────────────────
