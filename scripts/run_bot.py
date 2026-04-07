@@ -362,6 +362,8 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
     # ── Fin filtro de régimen ──────────────────────────────────────────────
 
     # Analizar mercado (MTF si disponible, fallback a STF)
+    logger.info("DEBUG MTF | df_htf=%s | mcfg=%s", df_htf is not None, mcfg.ENABLED)
+
     if df_htf is not None and not df_htf.empty and mcfg.ENABLED:
         resultado = analizar_mercado_mtf(df_ltf, df_htf)
         senal     = resultado["señal"]
