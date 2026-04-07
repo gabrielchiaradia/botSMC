@@ -329,6 +329,8 @@ class MTFStream:
 
     def iniciar(self, df_ltf_hist=None, df_htf_hist=None):
         """Arranca ambos streams con datos históricos opcionales."""
+        if df_htf_hist is not None and not df_htf_hist.empty:
+            self._df_htf_cache = df_htf_hist  # ← agregar solo esta línea
         self._stream_htf.iniciar(df_htf_hist)
         time.sleep(0.5)   # Pequeño delay para que el HTF arranque primero
         self._stream_ltf.iniciar(df_ltf_hist)
