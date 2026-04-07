@@ -340,6 +340,7 @@ class MTFStream:
 
     def _on_htf_close(self, df: pd.DataFrame, buffer: CandleBuffer):
         """Actualiza el buffer HTF cuando cierra una vela."""
+        self.buffer_htf = buffer 
         logger.debug("Vela HTF cerrada | %s | Close: $%.2f",
                      self.htf, df["close"].iloc[-1])
 
