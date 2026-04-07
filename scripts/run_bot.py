@@ -102,18 +102,43 @@ def ejecutar_orden_entrada(client, senal, tamanio, symbol) -> str:
     from binance.exceptions import BinanceAPIException
     from config import creds, exchange as excfg
 
-    lado    = "BUY"  if senal.direccion == "ALCISTA" else "SELL"
-    lado_sl = "SELL" if lado == "BUY" else "BUY"
+    lado          = "BUY"   if senal.direccion == "ALCISTA" else "SELL"
+    lado_sl       = "SELL"  if lado == "BUY" else "BUY"
+    position_side = "LONG"  if lado == "BUY" else "SHORT"   # Hedge Mode
 
-    sl_price = round(senal.stop_loss, 2)
-    tp_price = round(senal.take_profit, 2)
+    sl_price    = round(senal.stop_loss, 2)
+    tp_price    = round(senal.take_profit, 2)
+    entry_price = round(senal.precio_entrada, 2)
 
     try:
         orden = client.futures_create_order(
-            symbol=symbol, side=lado, type="MARKET", quantity=tamanio
+            symbol       = symbol,
+            side         = lado,
+            type         = "LIMIT",
+            quantity     = tamanio,
+            price        = entry_price,
+            timeInForce  = "IOC",          # Cancela si no llena al precio — sin slippage
+            positionSide = position_side,
         )
-        oid = str(orden["orderId"])
-        logger.info("Orden ejecutada: ID %s | %s %.3f %s", oid, lado, tamanio, symbol)
+        # IOC: puede llenarse parcialmente o cancelarse si el precio se movió
+        status = orden.get("status", "")
+        filled = float(orden.get("executedQty", 0))
+        oid    = str(orden["orderId"])
+
+        if status == "CANCELED" or filled == 0:
+            logger.warning("Orden LIMIT IOC no ejecutada (precio movido) — trade descartado.")
+            return ""
+        if filled < tamanio:
+            logger.warning("Orden LIMIT IOC parcialmente llenada: %.4f / %.4f — trade descartado.",
+                           filled, tamanio)
+            try:
+                client.futures_cancel_order(symbol=symbol, orderId=oid)
+            except Exception:
+                pass
+            return ""
+
+        logger.info("Orden LIMIT IOC ejecutada: ID %s | %s %.3f %s @ $%.2f",
+                    oid, lado, filled, symbol, entry_price)
     except BinanceAPIException as e:
         logger.error("Error orden entrada: %s", e)
         return ""
@@ -128,13 +153,14 @@ def ejecutar_orden_entrada(client, senal, tamanio, symbol) -> str:
         params = {
             "symbol":        symbol,
             "side":          lado_sl,
+            "positionSide":  position_side,   # Hedge Mode: identifica la posición a cerrar
             "quantity":      str(tamanio),
             "triggerprice":  str(stop_price),
             "price":         str(stop_price),
             "type":          tipo,
             "algoType":      "CONDITIONAL",
             "workingType":   "MARK_PRICE",
-            "reduceOnly":    "true",
+            # reduceOnly omitido: incompatible con positionSide en Hedge Mode
             "timestamp":     str(int(time.time() * 1000)),
         }
         query = urllib.parse.urlencode(params)
