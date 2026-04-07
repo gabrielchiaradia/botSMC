@@ -355,6 +355,10 @@ class MTFStream:
         Obtiene el contexto HTF del buffer y llama on_señal.
         """
         df_htf = getattr(self, '_df_htf_cache', None)
+        logger.info("DEBUG | df_htf_cache: %s | len: %s", 
+                df_htf is not None, 
+                len(df_htf) if df_htf is not None else 0)
+
         if df_htf is None or df_htf.empty or len(df_htf) < 20:
             logger.debug("Buffer HTF insuficiente, usando solo LTF.")
             df_htf = None
