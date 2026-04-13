@@ -93,6 +93,60 @@ def leer_regime_smc(symbol: str) -> int:
         logger.warning("[%s] No se pudo leer regime_state.json: %s — fallback", symbol, e)
         return -1
 
+def colocar_sl_tp(client, senal, tamanio, symbol) -> None:
+    """Coloca SL y TP via Algo Order API. Llamable desde cualquier path."""
+    import hmac, hashlib, time, urllib.request, urllib.parse, json
+    from config import creds, exchange as excfg
+
+    lado          = "BUY"  if senal.direccion == "ALCISTA" else "SELL"
+    lado_sl       = "SELL" if lado == "BUY" else "BUY"
+    position_side = "LONG" if lado == "BUY" else "SHORT"
+    sl_price      = round(senal.stop_loss, 2)
+    tp_price      = round(senal.take_profit, 2)
+    base_url      = (
+        "https://testnet.binancefuture.com"
+        if excfg.TESTNET else "https://fapi.binance.com"
+    )
+
+    def _algo_order(stop_price: float, tipo: str) -> bool:
+        params = {
+            "symbol":       symbol,
+            "side":         lado_sl,
+            "positionSide": position_side,
+            "quantity":     str(tamanio),
+            "triggerprice": str(stop_price),
+            "price":        str(stop_price),
+            "type":         tipo,
+            "algoType":     "CONDITIONAL",
+            "workingType":  "MARK_PRICE",
+            "timestamp":    str(int(time.time() * 1000)),
+        }
+        query = urllib.parse.urlencode(params)
+        sig   = hmac.new(
+            creds.BINANCE_API_SECRET.encode(),
+            query.encode(),
+            hashlib.sha256
+        ).hexdigest()
+        url = f"{base_url}/fapi/v1/algoOrder?{query}&signature={sig}"
+        req = urllib.request.Request(
+            url,
+            headers={"X-MBX-APIKEY": creds.BINANCE_API_KEY},
+            method="POST"
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10) as r:
+                resp = json.loads(r.read().decode())
+                logger.info("AlgoOrder %s OK: algoId=%s", tipo, resp.get("algoId"))
+                return True
+        except urllib.error.HTTPError as e:
+            logger.error("AlgoOrder %s error %s: %s", tipo, e.code, e.read().decode())
+            return False
+        except Exception as e:
+            logger.error("AlgoOrder %s error: %s", tipo, e)
+            return False
+
+    _algo_order(sl_price, "STOP")
+    _algo_order(tp_price, "TAKE_PROFIT")
 
 # ══════════════════════════════════════════════════════════
 #  EJECUCION DE ORDENES
@@ -161,8 +215,7 @@ def ejecutar_orden_entrada(client, senal, tamanio, symbol) -> str:
             logger.error("AlgoOrder %s error: %s", tipo, e)
             return False
 
-    _algo_order(sl_price, "STOP")
-    _algo_order(tp_price, "TAKE_PROFIT")
+    colocar_sl_tp(client, senal, tamanio, symbol)
     return oid
 
 def verificar_cierre_live(client, symbol, journal, balance):
@@ -447,6 +500,7 @@ def procesar_velas(df_ltf, df_htf, client, modo_live,
                 return
             else:
                 logger.info("[%s] Posición detectada post-timeout — registrando trade.", BOT_TAG)
+                colocar_sl_tp(client, senal, tamanio, excfg.SYMBOL)
     else:
         orden_id = ""
         accion   = "PAPER_ENTRADA"
