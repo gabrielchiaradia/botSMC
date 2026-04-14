@@ -266,16 +266,20 @@ def evaluar_senal_mtf(
         resultado.tiene_señal = True
         resultado.direccion   = senal_ltf.direccion
 
-        # Ajustar TP si hay OB/FVG del HTF como objetivo
+        # Ajustar TP si hay swing HTF como objetivo
+        # IMPORTANTE: validar que el nuevo TP sea favorable al entry
+        # (mayor que entry en LONG, menor que entry en SHORT)
         if senal_ltf.direccion == "ALCISTA" and ctx.ultimo_high:
             tp_htf = ctx.ultimo_high[1]
-            if tp_htf > precio and tp_htf < resultado.take_profit * 1.5:
-                resultado.take_profit = round(tp_htf * 0.995, 2)  # ligeramente antes
+            tp_candidato = round(tp_htf * 0.995, 2)  # ligeramente antes del swing
+            if tp_htf > precio and tp_candidato > resultado.precio_entrada:
+                resultado.take_profit = tp_candidato
                 resultado.motivos_mtf.append(f"TP ajustado a swing HTF ${tp_htf:.0f}")
         elif senal_ltf.direccion == "BAJISTA" and ctx.ultimo_low:
             tp_htf = ctx.ultimo_low[1]
-            if tp_htf < precio and tp_htf > resultado.take_profit * 0.5:
-                resultado.take_profit = round(tp_htf * 1.005, 2)
+            tp_candidato = round(tp_htf * 1.005, 2)
+            if tp_htf < precio and tp_candidato < resultado.precio_entrada:
+                resultado.take_profit = tp_candidato
                 resultado.motivos_mtf.append(f"TP ajustado a swing HTF ${tp_htf:.0f}")
     else:
         if resultado.alineacion == "OPUESTO":
